@@ -10,12 +10,13 @@ OMDB_API_KEY = "223e6df"
 # ✅ Telegram Channel ID
 CHANNEL_USERNAME = "newmoviesupdatechannel2"
 
-# ✅ Last 2 Din Ki Movies Fetch Karne Ka Function
+# ✅ Har Country Ki Movies Fetch Karne Ka Function
 def get_latest_movies():
     today = datetime.now().strftime("%Y-%m-%d")
-    two_days_ago = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
+    one_day_ago = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    url = f"https://api.themoviedb.org/3/discover/movie?api_key={TMDB_API_KEY}&sort_by=release_date.desc&release_date.gte={two_days_ago}&release_date.lte={today}&language=en&page=1"
+    url = f"https://api.themoviedb.org/3/discover/movie?api_key={TMDB_API_KEY}&sort_by=release_date.desc&release_date.gte={one_day_ago}&release_date.lte={today}&language=all&page=1&region="
+    
     response = requests.get(url)
 
     if response.status_code == 200:
@@ -23,13 +24,14 @@ def get_latest_movies():
         movies = data.get("results", [])
 
         movie_list = []
-        for movie in movies[:10]:
+        for movie in movies[:10]:  # Top 10 Latest Movies Fetch Karega
             title = movie.get("title", "Unknown")
             poster_path = movie.get("poster_path")
             imdb_id = get_imdb_id(movie.get("id"))
             overview = movie.get("overview", "No description available.")
             release_date = movie.get("release_date", "Unknown Date")
             language = movie.get("original_language", "Unknown").upper()
+            country = get_movie_country(movie.get("id"))
             imdb_rating = get_imdb_rating(imdb_id)
 
             full_poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
@@ -41,7 +43,8 @@ def get_latest_movies():
                 "imdb_rating": imdb_rating,
                 "overview": overview,
                 "release_date": release_date,
-                "language": language
+                "language": language,
+                "country": country
             })
 
         return movie_list
@@ -68,18 +71,30 @@ def get_imdb_rating(imdb_id):
         return data.get("imdbRating", "N/A")
     return "N/A"
 
+# ✅ Movie Ka Country Fetch Karne Ka Function
+def get_movie_country(tmdb_id):
+    url = f"https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={TMDB_API_KEY}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        countries = data.get("production_countries", [])
+        if countries:
+            return ", ".join([country.get("name", "Unknown") for country in countries])
+    return "Unknown"
+
 # ✅ /movies Command Ko Handle Karna
 @Client.on_message(filters.command("movies"))
 async def movies_command(client, message):
     movies = get_latest_movies()
 
     if not movies:
-        await message.reply_text("🎬 No new movies found in the last 2 days.")
+        await message.reply_text("🎬 No new movies found in the last 24 hours.")
         return
 
     for movie in movies:
         caption = f"🎬 **{movie['title']}**\n"
         caption += f"🌍 Language: {movie['language']}\n"
+        caption += f"🌎 Country: {movie['country']}\n"
         caption += f"📅 Release Date: {movie['release_date']}\n"
         caption += f"⭐ IMDB Rating: {movie['imdb_rating']}\n"
         caption += f"🎭 [IMDB Link](https://www.imdb.com/title/{movie['imdb_id']})\n"
@@ -90,7 +105,7 @@ async def movies_command(client, message):
         else:
             await message.reply_text(caption)
 
-# ✅ Har 6 Ghante Me Auto Update Channel Pe Bhejne Ka Function
+# ✅ Har 24 Ghante Me Auto Update Channel Pe Bhejne Ka Function
 async def send_movies_to_channel():
     while True:
         movies = get_latest_movies()
@@ -98,6 +113,7 @@ async def send_movies_to_channel():
             for movie in movies:
                 caption = f"🎬 **{movie['title']}**\n"
                 caption += f"🌍 Language: {movie['language']}\n"
+                caption += f"🌎 Country: {movie['country']}\n"
                 caption += f"📅 Release Date: {movie['release_date']}\n"
                 caption += f"⭐ IMDB Rating: {movie['imdb_rating']}\n"
                 caption += f"🎭 [IMDB Link](https://www.imdb.com/title/{movie['imdb_id']})\n"
@@ -108,6 +124,6 @@ async def send_movies_to_channel():
                 else:
                     await app.send_message(CHANNEL_USERNAME, caption)
         else:
-            await app.send_message(CHANNEL_USERNAME, "❌ No new movies found in the last 2 days.")
+            await app.send_message(CHANNEL_USERNAME, "❌ No new movies found in the last 24 hours.")
 
-        await asyncio.sleep(21600)  # ✅ 6 Hours (21600 Seconds) Baad Phir Se Run Karega
+        await asyncio.sleep(86400)  # ✅ 24 Hours (86400 Seconds) Baad Phir Se Run Karega
