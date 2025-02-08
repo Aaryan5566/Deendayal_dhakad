@@ -3,16 +3,16 @@ from pyrogram import Client, filters
 import random
 import time  
 
-# ✅ API Keys & Bot Credentials (Yaha Apni API Details Dalna)
-TMDB_API_KEY = "2937f761448c84e103d3ea8699d5a33c"
-BOT_TOKEN = "7917351134:AAFz-wi0zC0PabOOPcWIydblZmkd51WYjWI"
+# ✅ API Configuration (Manually Add)
 API_ID = "23378704"
 API_HASH = "15a02b4d02babeb79e8f328b0ead0c17"
+BOT_TOKEN = "7917351134:AAFz-wi0zC0PabOOPcWIydblZmkd51WYjWI"
+TMDB_API_KEY = "2937f761448c84e103d3ea8699d5a33c"
 
-# ✅ Pyrogram Client Initialize
-app = Client("MoviesBot", bot_token=BOT_TOKEN, api_id=API_ID, api_hash=API_HASH)
+# ✅ Initialize Pyrogram Client (Root)
+app = Client("MovieBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# ✅ Function: Fetch Upcoming Movies & Web Series
+# ✅ Function: Fetch 20 Upcoming Movies & Web Series
 def get_upcoming():
     url_movies = f"https://api.themoviedb.org/3/movie/upcoming?api_key={TMDB_API_KEY}&language=en-US&page=1"
     url_tv = f"https://api.themoviedb.org/3/tv/on_the_air?api_key={TMDB_API_KEY}&language=en-US&page=1"
@@ -46,13 +46,13 @@ def get_upcoming():
     else:
         return "❌ Error fetching upcoming movies & series."
 
-# ✅ Command: /movies
+# ✅ /movies Command Handler (Root Version)
 @app.on_message(filters.command("movies"))
 async def movies_command(client, message):
-    reactions = ["🔥", "🎬", "🍿", "💥", "⚡", "🚀", "🎞"]
+    reactions = ["😍", "👻", "🫡", "🤩", "🤡"]
     await message.react(random.choice(reactions))
 
-    msg = await message.reply_text("🎬 **Upcoming Movies & Web Series Fetching...** 🍿")
+    msg = await message.reply_text("🎬 **Movies Ka Asli Baap Aa Gaya! Hold Tight... 🔥**")
     
     time.sleep(4)
     await msg.delete()
@@ -75,6 +75,5 @@ async def movies_command(client, message):
         else:  # ❌ Agar Poster Nahi Hai Toh Sirf Text Send Karega
             await message.reply_text(caption)
 
-# ✅ Bot Start
-print("✅ Bot is running...")
+# ✅ Run Bot
 app.run()
