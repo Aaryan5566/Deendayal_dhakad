@@ -1,82 +1,88 @@
 import requests
+import asyncio
 from pyrogram import Client, filters
 import random
-import time  
 
-# ✅ API Configuration (Manually Add)
+# ✅ API KEYS & SETTINGS (Manually Add Karo)
 TMDB_API_KEY = "2937f761448c84e103d3ea8699d5a33c"
+OMDB_API_KEY = "223e6df"
+BOT_API_ID = 23378704
+BOT_API_HASH = "15a02b4d02babeb79e8f328b0ead0c17"
+BOT_TOKEN = "7917351134:AAFz-wi0zC0PabOOPcWIydblZmkd51WYjWI"
 
-# ✅ Function to Fetch Movie Details
+# ✅ MULTIPLE REACTIONS
+REACTIONS = ["😍", "👻", "🫡", "🤩", "🤡", "🔥"]
+
+# ✅ MOVIE INFO FETCH KARNE KA FUNCTION
 def get_movie_info(movie_name):
-    url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={movie_name}"
+    url = f"https://www.omdbapi.com/?t={movie_name}&apikey={OMDB_API_KEY}"
     response = requests.get(url)
 
     if response.status_code == 200:
         data = response.json()
-        results = data.get("results", [])
+        if data["Response"] == "True":
+            title = data["Title"]
+            release_date = data["Released"]
+            imdb_rating = data["imdbRating"]
+            actors = data["Actors"]
+            country = data["Country"]
+            plot = data["Plot"]
+            return f"🎬 **{title}**\n📅 Release Date: {release_date}\n⭐ IMDb: {imdb_rating}\n🌍 Country: {country}\n🎭 Actors: {actors}\n📖 {plot[:250]}..."
+    return "❌ Movie not found."
 
-        if not results:
-            return "❌ No movie found with this name."
+# ✅ TOP MOVIES BY IMDb RATING FETCH KARNE KA FUNCTION
+def get_top_movies():
+    url = f"https://api.themoviedb.org/3/movie/top_rated?api_key={TMDB_API_KEY}&language=en-US"
+    response = requests.get(url)
 
-        movie = results[0]  # First Search Result
-        title = movie.get("title", "Unknown")
-        release_date = movie.get("release_date", "N/A")
-        language = movie.get("original_language", "N/A").upper()
-        overview = movie.get("overview", "No description available.")
-        imdb_id = movie.get("id")
-        imdb_link = f"https://www.imdb.com/title/tt{imdb_id}/" if imdb_id else "N/A"
-        poster_path = movie.get("poster_path")
-        poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
+    if response.status_code == 200:
+        data = response.json()
+        movies = data.get("results", [])[:10]  # Top 10 Movies
+        top_movies = []
+        for movie in movies:
+            title = movie.get("title", "Unknown")
+            release_date = movie.get("release_date", "N/A")
+            imdb_rating = movie.get("vote_average", "N/A")
+            top_movies.append(f"🎬 **{title}**\n📅 Release Date: {release_date}\n⭐ IMDb: {imdb_rating}\n")
+        return top_movies
+    return ["❌ Error fetching top movies."]
 
-        return {
-            "title": title,
-            "release_date": release_date,
-            "language": language,
-            "overview": overview,
-            "imdb_link": imdb_link,
-            "poster_url": poster_url
-        }
-    else:
-        return "❌ Error fetching movie data."
-
-# ✅ /movieinfo Command Handler
+# ✅ /movieinfo COMMAND (MOVIE DETAILS WITH AUTO-DELETE)
 @Client.on_message(filters.command("movieinfo"))
-async def movie_info_command(client, message):
-    if len(message.command) < 2:
-        await message.reply_text("❌ **Please provide a movie name!**\n`Example: /movieinfo Inception`")
+async def movieinfo_command(client, message):
+    reaction = random.choice(REACTIONS)
+    await message.react(reaction)
+
+    movie_name = " ".join(message.command[1:])
+    if not movie_name:
+        await message.reply_text("❌ Please provide a movie name. Example: `/movieinfo Inception`")
         return
 
-    movie_name = " ".join(message.command[1:])  # Extract Movie Name
+    fetching_msg = await message.reply_text(f"🎬 **Fetching info for:** `{movie_name}`...\n🔍 Please wait...")
 
-    # 🎭 Multiple Reactions
-    reactions = ["😍", "👻", "🫡", "🤩", "🤡"]
-    reaction_emoji = random.choice(reactions)
-    await message.react(reaction_emoji)
+    movie_details = get_movie_info(movie_name)
+    await fetching_msg.delete()
+    movie_message = await message.reply_text(movie_details)
 
-    # 🎬 Stylish Fetching Message
-    fetching_message = await message.reply_text(
-        f"🍿 **Hold on! Fetching Movie Information...** 🎥\n\n"
-        f"🔍 Searching for `{movie_name}`..."
-    )
+    # ✅ 10 Minutes Ke Baad Delete Ho Jayega
+    await asyncio.sleep(600)
+    await movie_message.delete()
 
-    movie = get_movie_info(movie_name)
+# ✅ /topmovies COMMAND (TOP MOVIES WITH OP STYLE MESSAGE)
+@Client.on_message(filters.command("topmovies"))
+async def topmovies_command(client, message):
+    reaction = random.choice(REACTIONS)
+    await message.react(reaction)
 
-    if isinstance(movie, str):  # If Error
-        await fetching_message.edit_text(f"❌ {movie}")
-        return
+    fetching_msg = await message.reply_text("🎬 **Wait! Tere Liye Top Movies Dhoond Ke La Raha Hoon...🔥🔥🔥**")
 
-    caption = (
-        f"🎬 **{movie['title']}**\n"
-        f"📅 Release Date: {movie['release_date']}\n"
-        f"🌍 Language: {movie['language']}\n"
-        f"📖 {movie['overview'][:300]}...\n"  # 300 Character Summary
-        f"🔗 [IMDB Link]({movie['imdb_link']})"
-    )
+    top_movies = get_top_movies()
+    await fetching_msg.delete()
+    for movie in top_movies:
+        await message.reply_text(movie)
 
-    # ✅ Send Movie Poster if Available
-    if movie["poster_url"]:
-        await client.send_photo(message.chat.id, movie["poster_url"], caption=caption)
-    else:
-        await message.reply_text(caption)
+# ✅ TELEGRAM CLIENT SETUP
+bot = Client("PlungingMovieBot", api_id=BOT_API_ID, api_hash=BOT_API_HASH, bot_token=BOT_TOKEN)
 
-    await fetching_message.delete()  # Remove Fetching Message
+print("✅ Plunging Movie Bot is Running...")
+bot.run()
