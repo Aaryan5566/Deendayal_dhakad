@@ -2,7 +2,7 @@ import requests
 import random
 
 # ✅ TMDb API Key (Yaha Apni API Key Dalna)
-TMDB_API_KEY = "YOUR_TMDB_API_KEY"
+TMDB_API_KEY = "2937f761448c84e103d3ea8699d5a33c"
 
 # ✅ Trending Movies Fetch Karne Ka Function
 def get_trending_movies(country_code):
