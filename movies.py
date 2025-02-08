@@ -2,83 +2,54 @@ import requests
 from pyrogram import Client, filters
 import random
 
-# ✅ API Credentials Manually Yaha Dalna
-API_ID = "23378704"
-API_HASH = "15a02b4d02babeb79e8f328b0ead0c17"
-BOT_TOKEN = "7917351134:AAFz-wi0zC0PabOOPcWIydblZmkd51WYjWI"
-TMDB_API_KEY = "2937f761448c84e103d3ea8699d5a33c"
+# ✅ Wikipedia se Trending Movies & Web Series Fetch Karne Ka Function
+def get_trending_wikipedia():
+    url_movies = "https://en.wikipedia.org/api/rest_v1/page/summary/List_of_highest-grossing_films"
+    url_webseries = "https://en.wikipedia.org/api/rest_v1/page/summary/List_of_most-watched_Netflix_originals"
 
-# ✅ Image Show ON/OFF
-SHOW_PICS = True  
+    response_movies = requests.get(url_movies)
+    response_webseries = requests.get(url_webseries)
 
-app = Client("movies_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+    trending_movies = []
+    trending_webseries = []
 
-# ✅ Trending Content Fetch Karna
-def get_trending_content(media_type):
-    url = f"https://api.themoviedb.org/3/trending/{media_type}/day?api_key={TMDB_API_KEY}&language=en-US"
-    response = requests.get(url)
+    if response_movies.status_code == 200:
+        data = response_movies.json()
+        extract = data.get("extract", "").split("\n")
+        trending_movies = extract[:5]  # ✅ Sirf Top 5 Movies
 
-    if response.status_code == 200:
-        data = response.json()
-        items = data.get("results", [])
+    if response_webseries.status_code == 200:
+        data = response_webseries.json()
+        extract = data.get("extract", "").split("\n")
+        trending_webseries = extract[:5]  # ✅ Sirf Top 5 Web Series
 
-        if not items:
-            return "❌ No trending content found."
+    return trending_movies, trending_webseries
 
-        trending_list = []
-        for index, item in enumerate(items[:5], start=1):
-            title = item.get("title") or item.get("name") or "Unknown"
-            language = item.get("original_language", "N/A").upper()
-            release_date = item.get("release_date") or item.get("first_air_date") or "N/A"
-            imdb_id = item.get("id")
-            imdb_link = f"https://www.imdb.com/title/tt{imdb_id}/" if imdb_id else "N/A"
-            overview = item.get("overview", "No description available.")
-            poster_path = item.get("poster_path")
-            full_poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
-
-            trending_list.append({
-                "index": index,
-                "title": title,
-                "language": language,
-                "release_date": release_date,
-                "imdb_link": imdb_link,
-                "overview": overview,
-                "poster_url": full_poster_url
-            })
-
-        return trending_list
-    else:
-        return "❌ Error fetching trending content."
-
-@app.on_message(filters.command("movies"))
+# ✅ /movies Command Handler (Root Version)
+@Client.on_message(filters.command("movies"))
 async def movies_command(client, message):
-    reaction_emojis = ["🤡", "🔥", "🎬", "🍿", "🚀", "💥"]
-    for emoji in random.sample(reaction_emojis, 3):
-        await message.react(emoji)
+    # 🎭 Pehle Reaction & Message Send Karega
+    reaction_emojis = ["🤡", "🔥", "🎬", "🍿", "💥"]
+    await message.react(random.choice(reaction_emojis))
 
     reaction_message = await message.reply_text(
         "🎬 **Movie Ka Baap Aa Gaya! 🍿**\n"
-        "🔥 Hold tight... Finding the hottest trending movies & web series! 🚀"
+        "🔥 Hold tight... Tracking down the hottest trending movies & web series! 🚀"
     )
 
-    trending_movies = get_trending_content("movie")
-    trending_web_series = get_trending_content("tv")
+    movies, webseries = get_trending_wikipedia()
 
-    if isinstance(trending_movies, str) or isinstance(trending_web_series, str):  
-        await reaction_message.edit_text("❌ Error fetching trending movies or web series.")
+    if not movies and not webseries:
+        await reaction_message.edit_text("❌ No trending movies or web series found.")
         return
 
-    await message.reply_text("🎥 **Top 5 Trending Movies** 🌍")
-    for movie in trending_movies:
-        if SHOW_PICS and movie["poster_url"]:
-            await client.send_photo(message.chat.id, movie["poster_url"], caption=movie["title"])
-        else:
-            await message.reply_text(movie["title"])
+    result_text = "**🔥 Trending Movies:**\n"
+    for index, movie in enumerate(movies, start=1):
+        result_text += f"{index}. {movie}\n"
 
-    await message.reply_text("📺 **Top 5 Trending Web Series** 🌍")
-    for series in trending_web_series:
-        await message.reply_text(series["title"])
+    result_text += "\n**🎭 Trending Web Series:**\n"
+    for index, series in enumerate(webseries, start=1):
+        result_text += f"{index}. {series}\n"
 
-    await reaction_message.delete()
-
-app.run()
+    await reaction_message.edit_text(result_text)
+    await reaction_message.delete()  # Pehle Wala Message Hata Dega
