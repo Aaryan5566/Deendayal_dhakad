@@ -1,44 +1,34 @@
 import requests
 from pyrogram import Client, filters
 import random
+from info import OMDB_API_KEY, SHOW_PICS  # ✅ API & Settings `info.py` Se Fetch Karega
 
-# ✅ TMDb API Key (Yaha Apni API Key Dalna)
-TMDB_API_KEY = "2937f761448c84e103d3ea8699d5a33c"
-
-# ✅ Image Show ON/OFF (True = Image Show, False = Sirf Text)
-SHOW_PICS = True  
-
-# ✅ Trending Movies Fetch Karne Ka Function
+# ✅ Trending Movies Fetch Karne Ka Function (OMDb API)
 def get_trending_movies():
-    url = f"https://api.themoviedb.org/3/trending/all/day?api_key={TMDB_API_KEY}&language=en-US"
+    url = f"http://www.omdbapi.com/?apikey={OMDB_API_KEY}&s=latest&type=movie"
     response = requests.get(url)
 
     if response.status_code == 200:
         data = response.json()
-        movies = data.get("results", [])
+        movies = data.get("Search", [])
 
         if not movies:
             return "❌ No trending movies found."
 
         trending_list = []
-        for index, movie in enumerate(movies[:10], start=1):  # Sirf Top 10 Movies & Web Series Show Karega
-            title = movie.get("title") or movie.get("name") or "Unknown"
-            language = movie.get("original_language", "N/A").upper()
-            release_date = movie.get("release_date") or movie.get("first_air_date") or "N/A"
-            imdb_id = movie.get("id")
-            imdb_link = f"https://www.imdb.com/title/tt{imdb_id}/" if imdb_id else "N/A"
-            overview = movie.get("overview", "No description available.")
-            poster_path = movie.get("poster_path")
-            full_poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
+        for index, movie in enumerate(movies[:10], start=1):  # Sirf Top 10 Movies Show Karega
+            title = movie.get("Title", "Unknown")
+            year = movie.get("Year", "N/A")
+            imdb_id = movie.get("imdbID")
+            imdb_link = f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else "N/A"
+            poster_url = movie.get("Poster") if movie.get("Poster") and movie.get("Poster") != "N/A" else None
 
             trending_list.append({
                 "index": index,
                 "title": title,
-                "language": language,
-                "release_date": release_date,
+                "year": year,
                 "imdb_link": imdb_link,
-                "overview": overview,
-                "poster_url": full_poster_url
+                "poster_url": poster_url
             })
 
         return trending_list
@@ -48,13 +38,14 @@ def get_trending_movies():
 # ✅ /movies Command Handler (Plugins Version)
 @Client.on_message(filters.command("movies"))
 async def movies_command(client, message):
-    # 🎭 Pehle Reaction & Message Send Karega
-    reaction_emoji = random.choice(["🤡", "🔥", "🎬", "🍿"])
-    await message.react(reaction_emoji)
+    # 🎭 Pehle Multiple Reaction Lagayega
+    reaction_emojis = ["🤡", "🔥", "🎬", "🍿", "👀", "💥"]
+    for emoji in reaction_emojis:
+        await message.react(emoji)
 
     reaction_message = await message.reply_text(
         "🎬 **Movie Ka Baap Aa Gaya! 🍿**\n"
-        "🔥 Hold tight... Tracking down the hottest trending movies & web series! 🚀"
+        "🔥 Hold tight... Tracking down the hottest trending movies! 🚀"
     )
 
     movies = get_trending_movies()
@@ -65,11 +56,8 @@ async def movies_command(client, message):
 
     for movie in movies:
         caption = (
-            f"🎬 **{movie['title']}**\n"
-            f"🌍 Language: {movie['language']}\n"
-            f"📅 Release Date: {movie['release_date']}\n"
+            f"🎬 **{movie['title']} ({movie['year']})**\n"
             f"🎭 [IMDB Link]({movie['imdb_link']})\n"
-            f"📖 {movie['overview'][:300]}..."  # Sirf 300 Characters Ki Summary
         )
 
         if SHOW_PICS and movie["poster_url"]:  # ✅ Agar SHOW_PICS = True hai toh Image Send Karega
