@@ -3,68 +3,80 @@ from pyrogram import Client, filters
 import random
 import time  
 
-# ✅ API Key & Configurations (Manually Replace)
+# ✅ API Configuration (Manually Add)
 TMDB_API_KEY = "2937f761448c84e103d3ea8699d5a33c"
 
-# ✅ Function: Fetch 20 Upcoming Movies & Web Series
-def get_upcoming():
-    url_movies = f"https://api.themoviedb.org/3/movie/upcoming?api_key={TMDB_API_KEY}&language=en-US&page=1"
-    url_tv = f"https://api.themoviedb.org/3/tv/on_the_air?api_key={TMDB_API_KEY}&language=en-US&page=1"
+# ✅ Function to Fetch Movie Details
+def get_movie_info(movie_name):
+    url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={movie_name}"
+    response = requests.get(url)
 
-    movies_response = requests.get(url_movies)
-    tv_response = requests.get(url_tv)
+    if response.status_code == 200:
+        data = response.json()
+        results = data.get("results", [])
 
-    upcoming_list = []
+        if not results:
+            return "❌ No movie found with this name."
 
-    if movies_response.status_code == 200 and tv_response.status_code == 200:
-        movies = movies_response.json()["results"][:10]  # ✅ 10 Upcoming Movies
-        tv_shows = tv_response.json()["results"][:10]   # ✅ 10 Upcoming TV Series
+        movie = results[0]  # First Search Result
+        title = movie.get("title", "Unknown")
+        release_date = movie.get("release_date", "N/A")
+        language = movie.get("original_language", "N/A").upper()
+        overview = movie.get("overview", "No description available.")
+        imdb_id = movie.get("id")
+        imdb_link = f"https://www.imdb.com/title/tt{imdb_id}/" if imdb_id else "N/A"
+        poster_path = movie.get("poster_path")
+        poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
 
-        for movie in movies:
-            upcoming_list.append({
-                "title": movie.get("title", "Unknown"),
-                "release_date": movie.get("release_date", "N/A"),
-                "language": movie.get("original_language", "N/A").upper(),
-                "poster_url": f"https://image.tmdb.org/t/p/w500{movie['poster_path']}" if movie.get("poster_path") else None
-            })
-
-        for show in tv_shows:
-            upcoming_list.append({
-                "title": show.get("name", "Unknown"),
-                "release_date": show.get("first_air_date", "N/A"),
-                "language": show.get("original_language", "N/A").upper(),
-                "poster_url": f"https://image.tmdb.org/t/p/w500{show['poster_path']}" if show.get("poster_path") else None
-            })
-
-        return upcoming_list
+        return {
+            "title": title,
+            "release_date": release_date,
+            "language": language,
+            "overview": overview,
+            "imdb_link": imdb_link,
+            "poster_url": poster_url
+        }
     else:
-        return "❌ Error fetching upcoming movies & series."
+        return "❌ Error fetching movie data."
 
-# ✅ /movies Command Handler (Plugins Version)
-@Client.on_message(filters.command("movies"))
-async def movies_command(client, message):
-    reactions = ["😍", "👻", "🫡", "🤩", "🤡"]
-    await message.react(random.choice(reactions))
-
-    msg = await message.reply_text("🎬 **Movies Ka Asli Baap Aa Gaya! Hold Tight... 🔥**")
-    
-    time.sleep(4)
-    await msg.delete()
-
-    upcoming = get_upcoming()
-
-    if isinstance(upcoming, str):  # ❌ Agar Koi Error Aaye
-        await message.reply_text(upcoming)
+# ✅ /movieinfo Command Handler
+@Client.on_message(filters.command("movieinfo"))
+async def movie_info_command(client, message):
+    if len(message.command) < 2:
+        await message.reply_text("❌ **Please provide a movie name!**\n`Example: /movieinfo Inception`")
         return
 
-    for item in upcoming:
-        caption = (
-            f"🎬 **{item['title']}**\n"
-            f"📅 Release Date: {item['release_date']}\n"
-            f"🌍 Language: {item['language']}\n"
-        )
+    movie_name = " ".join(message.command[1:])  # Extract Movie Name
 
-        if item["poster_url"]:  # ✅ Agar Poster Hai Toh Image Send Karega
-            await client.send_photo(message.chat.id, item["poster_url"], caption=caption)
-        else:  # ❌ Agar Poster Nahi Hai Toh Sirf Text Send Karega
-            await message.reply_text(caption)
+    # 🎭 Multiple Reactions
+    reactions = ["😍", "👻", "🫡", "🤩", "🤡"]
+    reaction_emoji = random.choice(reactions)
+    await message.react(reaction_emoji)
+
+    # 🎬 Stylish Fetching Message
+    fetching_message = await message.reply_text(
+        f"🍿 **Hold on! Fetching Movie Information...** 🎥\n\n"
+        f"🔍 Searching for `{movie_name}`..."
+    )
+
+    movie = get_movie_info(movie_name)
+
+    if isinstance(movie, str):  # If Error
+        await fetching_message.edit_text(f"❌ {movie}")
+        return
+
+    caption = (
+        f"🎬 **{movie['title']}**\n"
+        f"📅 Release Date: {movie['release_date']}\n"
+        f"🌍 Language: {movie['language']}\n"
+        f"📖 {movie['overview'][:300]}...\n"  # 300 Character Summary
+        f"🔗 [IMDB Link]({movie['imdb_link']})"
+    )
+
+    # ✅ Send Movie Poster if Available
+    if movie["poster_url"]:
+        await client.send_photo(message.chat.id, movie["poster_url"], caption=caption)
+    else:
+        await message.reply_text(caption)
+
+    await fetching_message.delete()  # Remove Fetching Message
