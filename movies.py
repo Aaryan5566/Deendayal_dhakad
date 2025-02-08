@@ -1,79 +1,65 @@
 import requests
+from pyrogram import Client, filters
 import asyncio
 import random
-from pyrogram import Client, filters
 
-# ✅ TMDb API Key (Yaha Apni API Key Dalna)
+# 🛠️ TMDb API Config
 TMDB_API_KEY = "2937f761448c84e103d3ea8699d5a33c"
+TMDB_URL = "https://api.themoviedb.org/3/trending/all/day"
 
-# ✅ Image Show ON/OFF (True = Image Show, False = Sirf Text)
-SHOW_PICS = True  
+# 📌 Image Show ON/OFF (True = Image, False = Sirf Text)
+SHOW_PICS = False
 
-# ✅ Trending Movies Fetch Karne Ka Function
+# 🔥 Multiple Reactions
+REACTIONS = ["🔥", "🎬", "🍿", "💥", "🎭"]
+
+# 📽️ Trending Movies & Web Series Fetch Karne Ka Function
 def get_trending_movies():
-    url = f"https://api.themoviedb.org/3/trending/all/day?api_key={TMDB_API_KEY}&language=en-IN"
-    response = requests.get(url)
+    params = {"api_key": TMDB_API_KEY, "language": "en-US"}
+    response = requests.get(TMDB_URL, params=params)
 
     if response.status_code == 200:
-        data = response.json()
-        movies = data.get("results", [])
+        data = response.json().get("results", [])
+        
+        movies = [m for m in data if m.get("media_type") == "movie"][:5]  # 🎥 Top 5 Movies
+        web_series = [w for w in data if w.get("media_type") == "tv"][:5]  # 📺 Top 5 Web Series
+        
+        return movies, web_series
+    return None, None
 
-        if not movies:
-            return "❌ No trending movies found."
-
-        trending_list = []
-        for index, movie in enumerate(movies[:5], start=1):  # Sirf Top 5 Movies Show Karega
-            title = movie.get("title") or movie.get("name") or "Unknown"
-            language = movie.get("original_language", "N/A").upper()
-            release_date = movie.get("release_date") or movie.get("first_air_date") or "N/A"
-            imdb_id = movie.get("id")
-            imdb_link = f"https://www.imdb.com/title/tt{imdb_id}/" if imdb_id else "N/A"
-            overview = movie.get("overview", "No description available.")
-            poster_path = movie.get("poster_path")
-            full_poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
-
-            trending_list.append({
-                "index": index,
-                "title": title,
-                "language": language,
-                "release_date": release_date,
-                "imdb_link": imdb_link,
-                "overview": overview,
-                "poster_url": full_poster_url
-            })
-
-        return trending_list
-    else:
-        return "❌ Error fetching trending movies."
-
-# ✅ /movies Command Handler
+# 🎬 /movies Command Handler
 @Client.on_message(filters.command("movies"))
 async def movies_command(client, message):
-    # 🎭 Multiple Reactions
-    reaction_emojis = ["🔥", "🎬", "🍿", "🚀"]
-    await message.react(random.choice(reaction_emojis))
+    await message.react(random.choice(REACTIONS))  # 🔥 Random Reaction
 
-    # 🎬 "Movies Ka Baap" Message 4 sec tak show karega
-    reaction_message = await message.reply_text("🎬 **Movies Ka Baap Aa Gaya!** 🍿")
-    await asyncio.sleep(4)
-    await reaction_message.delete()
+    # ⏳ "Movies ka Baap!" Message
+    banner_message = await message.reply_text("🎬 **Movies ka Baap! 🍿🔥**\n_Looking for the latest trending movies & web series..._")
+    await asyncio.sleep(4)  # ⏳ 4 Sec Delay
+    await banner_message.delete()
 
-    movies = get_trending_movies()
-
-    if isinstance(movies, str):  # Agar Koi Error Aayi
-        await message.reply_text(f"❌ {movies}")
+    # 🎥 Trending Movies & Web Series Fetch Karna
+    movies, web_series = get_trending_movies()
+    
+    if not movies and not web_series:
+        await message.reply_text("❌ _Failed to fetch trending movies._")
         return
 
-    for movie in movies:
-        caption = (
-            f"🎬 **{movie['title']}**\n"
-            f"🌍 Language: {movie['language']}\n"
-            f"📅 Release Date: {movie['release_date']}\n"
-            f"🎭 [IMDB Link]({movie['imdb_link']})\n"
-            f"📖 {movie['overview'][:300]}..."  # Sirf 300 Characters Ki Summary
-        )
+    # 📌 Trending Movies
+    trending_text = "**🔥 Trending Movies:**\n"
+    for index, movie in enumerate(movies, start=1):
+        title = movie.get("title", "Unknown")
+        language = movie.get("original_language", "N/A").upper()
+        release_date = movie.get("release_date", "N/A")
+        imdb_link = f"https://www.imdb.com/title/tt{movie.get('id')}/"
+        trending_text += f"\n**{index}. {title}**\n📅 {release_date} | 🌍 {language} | 🎭 [IMDB]({imdb_link})\n"
 
-        if SHOW_PICS and movie["poster_url"]:  # ✅ Agar SHOW_PICS = True hai toh Image Send Karega
-            await client.send_photo(message.chat.id, movie["poster_url"], caption=caption)
-        else:  # ✅ Agar SHOW_PICS = False hai toh Sirf Text Send Karega
-            await message.reply_text(caption)
+    # 📺 Trending Web Series
+    trending_text += "\n**📺 Trending Web Series:**\n"
+    for index, series in enumerate(web_series, start=1):
+        title = series.get("name", "Unknown")
+        language = series.get("original_language", "N/A").upper()
+        release_date = series.get("first_air_date", "N/A")
+        imdb_link = f"https://www.imdb.com/title/tt{series.get('id')}/"
+        trending_text += f"\n**{index}. {title}**\n📅 {release_date} | 🌍 {language} | 🎭 [IMDB]({imdb_link})\n"
+
+    await message.reply_text(trending_text)
