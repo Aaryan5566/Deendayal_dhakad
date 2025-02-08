@@ -21,11 +21,6 @@ SESSION = environ.get('SESSION', 'Media_search')
 API_ID = 23378704  
 API_HASH = "15a02b4d02babeb79e8f328b0ead0c17"
 BOT_TOKEN = "7917351134:AAFz-wi0zC0PabOOPcWIydblZmkd51WYjWI"
-# ✅ OMDb API Key (Yaha Apni API Key Dalna)
-OMDB_API_KEY = "223e6df"
-
-# ✅ Image Show ON/OFF (True = Image Show, False = Sirf Text)
-SHOW_PICS = True
 # ============================
 # Bot Settings Configuration
 # ============================
