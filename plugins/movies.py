@@ -3,24 +3,29 @@ import asyncio
 from pyrogram import Client, filters
 import random
 
-# ✅ TMDb API Key (Apni API Key Dalna)
+# ✅ TMDb API Key
 TMDB_API_KEY = "2937f761448c84e103d3ea8699d5a33c"
 
 # ✅ Random Emoji Reactions
 REACTIONS = ["🔥", "😍", "🤩", "🤡", "👻", "🎬", "🫡", "🍿"]
 
-# ✅ Fetch Top 10 Highest IMDb Rated Movies
-def get_top_imdb_movies():
+# ✅ Fetch Top 10 IMDb Movies
+def get_top_imdb_movies(year=None):
     url = f"https://api.themoviedb.org/3/discover/movie?api_key={TMDB_API_KEY}&sort_by=vote_average.desc&vote_count.gte=1000&language=en-US"
+    if year:
+        url += f"&primary_release_year={year}"
     response = requests.get(url)
-    
-    if response.status_code == 200:
-        data = response.json()
-        movies = data.get("results", [])[:10]  # Sirf Top 10 Movies
-        return movies
-    return []
+    return response.json().get("results", [])[:10] if response.status_code == 200 else []
 
-# ✅ /topmovies Command - Highest IMDb Rated Movies
+# ✅ Fetch Top 10 IMDb Web Series
+def get_top_imdb_tv_shows(year=None):
+    url = f"https://api.themoviedb.org/3/discover/tv?api_key={TMDB_API_KEY}&sort_by=vote_average.desc&vote_count.gte=500&language=en-US"
+    if year:
+        url += f"&first_air_date_year={year}"
+    response = requests.get(url)
+    return response.json().get("results", [])[:10] if response.status_code == 200 else []
+
+# ✅ /topmovies Command - Highest IMDb Rated Movies (Auto-Delete Enabled)
 @Client.on_message(filters.command("topmovies"))
 async def top_movies_command(client, message):
     reaction = random.choice(REACTIONS)
@@ -28,7 +33,7 @@ async def top_movies_command(client, message):
 
     msg = await message.reply_text("🎬 **Wait... Tere Liye Top IMDb Movies Dhund Raha Hoon! 🍿**")
     await asyncio.sleep(3)
-    
+
     movies = get_top_imdb_movies()
     if not movies:
         await msg.edit_text("❌ No top IMDb movies found.")
@@ -41,58 +46,39 @@ async def top_movies_command(client, message):
         rating = movie.get("vote_average", "N/A")
         response_text += f"**{index}. {title}**\n⭐ IMDb: {rating}/10\n📅 Release: {release_date}\n\n"
 
-    await msg.edit_text(response_text)
-
-# ✅ Fetch Movie Info
-def get_movie_info(movie_name):
-    search_url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={movie_name}"
-    response = requests.get(search_url)
+    top_msg = await msg.edit_text(response_text)
     
-    if response.status_code == 200:
-        data = response.json()
-        if data["results"]:
-            movie = data["results"][0]  # First Result
-            return movie
-    return None
+    await asyncio.sleep(600)  # 10 Min Baad Message Delete
+    await top_msg.delete()
 
-# ✅ /movieinfo Command - Fetch Movie Details
-@Client.on_message(filters.command("movieinfo"))
-async def movie_info_command(client, message):
+# ✅ /topmoviesYYYY Command - Top Movies & Web Series of a Specific Year (Auto-Delete Enabled)
+@Client.on_message(filters.command(re.compile(r"topmovies(\d{4})")))
+async def top_movies_year_command(client, message):
     reaction = random.choice(REACTIONS)
     await message.react(reaction)
 
-    query = message.text.split(" ", 1)
-    if len(query) < 2:
-        await message.reply_text("❌ Please enter a movie name! Example: `/movieinfo Inception`")
-        return
+    year = int(message.matches[0].group(1))
+    msg = await message.reply_text(f"🎬 **Wait... Top IMDb Movies & Web Series for {year} Fetch Kar Raha Hoon! 🍿**")
+    await asyncio.sleep(3)
 
-    movie_name = query[1]
-    msg = await message.reply_text(f"🎬 **Fetching Movie Information for:** `{movie_name}`...")
-    
-    movie = get_movie_info(movie_name)
-    if not movie:
-        await msg.edit_text("❌ Movie not found!")
-        return
-    
-    title = movie.get("title", "Unknown")
-    release_date = movie.get("release_date", "N/A")
-    rating = movie.get("vote_average", "N/A")
-    overview = movie.get("overview", "No description available.")
-    poster_path = movie.get("poster_path")
-    full_poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
+    movies = get_top_imdb_movies(year)
+    tv_shows = get_top_imdb_tv_shows(year)
 
-    caption = (
-        f"🎬 **{title}**\n"
-        f"⭐ IMDb Rating: {rating}/10\n"
-        f"📅 Release Date: {release_date}\n"
-        f"📖 {overview[:400]}..."  # Sirf 400 Characters Tak Summary
-    )
+    response_text = f"**🔥 Top 10 IMDb Movies ({year}):**\n\n"
+    for index, movie in enumerate(movies, start=1):
+        title = movie.get("title", "Unknown")
+        release_date = movie.get("release_date", "N/A")
+        rating = movie.get("vote_average", "N/A")
+        response_text += f"**{index}. {title}**\n⭐ IMDb: {rating}/10\n📅 Release: {release_date}\n\n"
 
-    if full_poster_url:
-        movie_msg = await client.send_photo(message.chat.id, full_poster_url, caption=caption)
-    else:
-        movie_msg = await message.reply_text(caption)
+    response_text += f"\n**📺 Top 10 IMDb Web Series ({year}):**\n\n"
+    for index, tv_show in enumerate(tv_shows, start=1):
+        title = tv_show.get("name", "Unknown")
+        first_air_date = tv_show.get("first_air_date", "N/A")
+        rating = tv_show.get("vote_average", "N/A")
+        response_text += f"**{index}. {title}**\n⭐ IMDb: {rating}/10\n📅 First Aired: {first_air_date}\n\n"
 
-    await msg.delete()  # Pehle Wala Fetching Message Hata Dega
+    year_msg = await msg.edit_text(response_text)
+
     await asyncio.sleep(600)  # 10 Min Baad Message Delete
-    await movie_msg.delete()
+    await year_msg.delete()
