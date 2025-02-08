@@ -1,9 +1,14 @@
 import requests
 from pyrogram import Client, filters
 import random
-from info import OMDB_API_KEY, SHOW_PICS  # ✅ API & Settings Fetch Karega
 
-# ✅ Trending Movies & Web Series Fetch Karne Ka Function
+# ✅ OMDb API Key (Manually Add Karna)
+OMDB_API_KEY = "223e6df"
+
+# ✅ Image Show ON/OFF (True = Image Show, False = Sirf Text)
+SHOW_PICS = True  
+
+# ✅ Trending Movies Fetch Karne Ka Function
 def get_trending_movies():
     url = f"https://www.omdbapi.com/?apikey={OMDB_API_KEY}&s=trending&type=movie"
     response = requests.get(url)
