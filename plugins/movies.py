@@ -43,10 +43,10 @@ def get_upcoming():
 # ✅ /movies Command Handler (Plugins Version)
 @Client.on_message(filters.command("movies"))
 async def movies_command(client, message):
-    reactions = ["🔥", "🎬", "🍿", "💥", "⚡", "🚀", "🎞"]
+    reactions = ["😍", "👻", "🫡", "🤩", "🤡"]
     await message.react(random.choice(reactions))
 
-    msg = await message.reply_text("🎬 **Upcoming Movies & Web Series Fetching...** 🍿")
+    msg = await message.reply_text("🎬 **Movies Ka Asli Baap Aa Gaya! Hold Tight... 🔥**")
     
     time.sleep(4)
     await msg.delete()
