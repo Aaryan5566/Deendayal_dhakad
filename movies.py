@@ -2,72 +2,79 @@ import requests
 from pyrogram import Client, filters
 import random
 
-# ✅ OMDb API Key (Yaha Apni API Key Dalna)
-OMDB_API_KEY = "223e6df"  
+# ✅ Manually Add Your API Details Here
+API_ID = 23378704  # ⚠️ Yaha Apni API ID Dalna
+API_HASH = "15a02b4d02babeb79e8f328b0ead0c17"  # ⚠️ Yaha Apni API Hash Dalna
+BOT_TOKEN = "7917351134:AAFz-wi0zC0PabOOPcWIydblZmkd51WYjWI"  # ⚠️ Yaha Apna Bot Token Dalna
+OMDB_API_KEY = "223e6df"  # ⚠️ Yaha Apni OMDb API Key Dalna
 
-# ✅ Image Show ON/OFF (True = Image Show, False = Sirf Text)
-SHOW_PICS = False  
+# ✅ Pyrogram Client Setup
+app = Client("movies_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# ✅ Trending Web Series Fetch Karne Ka Function
-def get_trending_web_series():
+# ✅ OMDb API Se Trending Movies & Web Series Fetch Karne Ka Function
+def get_trending_movies():
+    url = f"https://www.omdbapi.com/?s=movie&type=movie&apikey={OMDB_API_KEY}"
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        data = response.json()
+        movies = data.get("Search", [])
+        if not movies:
+            return "❌ No trending movies found."
+
+        trending_list = []
+        for index, movie in enumerate(movies[:5], start=1):  # Sirf Top 5 Movies
+            title = movie.get("Title", "Unknown")
+            year = movie.get("Year", "N/A")
+            imdb_id = movie.get("imdbID", "N/A")
+            imdb_link = f"https://www.imdb.com/title/{imdb_id}/"
+            
+            trending_list.append(f"🎬 **{index}. {title} ({year})**\n🎭 [IMDB Link]({imdb_link})\n")
+
+        return "\n".join(trending_list)
+    else:
+        return "❌ Error fetching movies."
+
+def get_trending_series():
     url = f"https://www.omdbapi.com/?s=series&type=series&apikey={OMDB_API_KEY}"
     response = requests.get(url)
 
     if response.status_code == 200:
         data = response.json()
         series = data.get("Search", [])
-
         if not series:
             return "❌ No trending web series found."
 
         trending_list = []
-        for index, show in enumerate(series[:5], start=1):  # Sirf Top 5 Web Series Show Karega
+        for index, show in enumerate(series[:5], start=1):  # Sirf Top 5 Series
             title = show.get("Title", "Unknown")
             year = show.get("Year", "N/A")
-            imdb_id = show.get("imdbID", "")
-            imdb_link = f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else "N/A"
-            poster_url = show.get("Poster") if SHOW_PICS else None
+            imdb_id = show.get("imdbID", "N/A")
+            imdb_link = f"https://www.imdb.com/title/{imdb_id}/"
+            
+            trending_list.append(f"📺 **{index}. {title} ({year})**\n🎭 [IMDB Link]({imdb_link})\n")
 
-            trending_list.append({
-                "index": index,
-                "title": title,
-                "year": year,
-                "imdb_link": imdb_link,
-                "poster_url": poster_url
-            })
-
-        return trending_list
+        return "\n".join(trending_list)
     else:
-        return "❌ Error fetching trending web series."
+        return "❌ Error fetching series."
 
-# ✅ /series Command Handler (Plugins Version)
-@Client.on_message(filters.command("series"))
-async def series_command(client, message):
-    # 🎭 Pehle Reaction & Message Send Karega
-    reaction_emojis = ["🔥", "📺", "🎭", "🎥", "⭐"]
-    await message.react(random.choice(reaction_emojis))
+# ✅ /movies Command Handler
+@app.on_message(filters.command("movies"))
+async def movies_command(client, message):
+    # 🔥 Multiple Reactions
+    reactions = ["🔥", "💥", "🤩", "🎬", "🍿"]
+    for reaction in reactions:
+        await message.react(reaction)
 
-    reaction_message = await message.reply_text(
-        "📺 **Web Series Ka Baap Aa Gaya! 🎭**\n"
-        "🔥 Hold tight... Fetching the latest trending web series! 🚀"
-    )
+    # 🎭 Custom "Movies ka Baap" Message
+    await message.reply_text("🎬 **Movies ka Baap Aa Gaya!** 🍿\n🔍 Fetching trending movies & web series...")
 
-    series = get_trending_web_series()
+    movies = get_trending_movies()
+    series = get_trending_series()
 
-    if isinstance(series, str):  # Agar Koi Error Aayi
-        await reaction_message.edit_text(f"❌ {series}")
-        return
+    trending_text = f"🔥 **Trending Movies:**\n{movies}\n\n🎭 **Trending Web Series:**\n{series}"
+    
+    await message.reply_text(trending_text)
 
-    for show in series:
-        caption = (
-            f"📺 **{show['title']}**\n"
-            f"📅 Year: {show['year']}\n"
-            f"🎭 [IMDB Link]({show['imdb_link']})"
-        )
-
-        if SHOW_PICS and show["poster_url"]:  # ✅ Agar SHOW_PICS = True hai toh Image Send Karega
-            await client.send_photo(message.chat.id, show["poster_url"], caption=caption)
-        else:  # ✅ Agar SHOW_PICS = False hai toh Sirf Text Send Karega
-            await message.reply_text(caption)
-
-    await reaction_message.delete()  # Pehle Wala Message Hata Dega
+# ✅ Bot Start Karega
+app.run()
