@@ -2,42 +2,36 @@ import requests
 from pyrogram import Client, filters
 import random
 
-# ✅ OMDb API Key (Manually Add Karna)
-OMDB_API_KEY = "223e6df"
-
 # ✅ Image Show ON/OFF (True = Image Show, False = Sirf Text)
 SHOW_PICS = True  
 
-# ✅ Trending Movies Fetch Karne Ka Function
+# ✅ Trending Movies & Web Series Fetch Karne Ka Function (Google Search)
 def get_trending_movies():
-    url = f"https://www.omdbapi.com/?apikey={OMDB_API_KEY}&s=trending&type=movie"
-    response = requests.get(url)
+    search_url = "https://www.google.com/search?q=trending+movies+and+web+series"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    response = requests.get(search_url, headers=headers)
 
     if response.status_code == 200:
-        data = response.json()
-        movies = data.get("Search", [])
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(response.text, "html.parser")
+        movies = [movie.text for movie in soup.find_all("h3")][:10]  # ✅ Google Se Top 10 Movies/Web Series Fetch Karega
 
         if not movies:
             return "❌ No trending movies found."
 
         trending_list = []
-        for index, movie in enumerate(movies[:5], start=1):  # ✅ 5 Movies
-            title = movie.get("Title", "Unknown")
-            language = "🌍 Multiple Languages"
-            release_date = movie.get("Year", "N/A")
-            imdb_id = movie.get("imdbID")
-            imdb_link = f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else "N/A"
-            overview = "📖 No description available (OMDb doesn't provide overview)."
-            poster_url = movie.get("Poster", None)
-
+        for index, title in enumerate(movies, start=1):
+            imdb_link = f"https://www.google.com/search?q={title.replace(' ', '+')}+IMDB"
             trending_list.append({
                 "index": index,
                 "title": title,
-                "language": language,
-                "release_date": release_date,
+                "language": "🌍 Multiple Languages",
+                "release_date": "N/A",
                 "imdb_link": imdb_link,
-                "overview": overview,
-                "poster_url": poster_url
+                "overview": "📖 No description available.",
+                "poster_url": None
             })
 
         return trending_list
@@ -47,7 +41,7 @@ def get_trending_movies():
 # ✅ /movies Command Handler (Plugins Version)
 @Client.on_message(filters.command("movies"))
 async def movies_command(client, message):
-    # 🎭 Pehle Multiple Reactions Lagayega
+    # 🎭 Multiple Reactions Lagayega
     reactions = ["🤡", "🔥", "🎬", "🍿", "💥", "🎭"]
     for emoji in reactions:
         await message.react(emoji)
@@ -68,13 +62,10 @@ async def movies_command(client, message):
             f"🎬 **{movie['title']}**\n"
             f"🌍 Language: {movie['language']}\n"
             f"📅 Release Date: {movie['release_date']}\n"
-            f"🎭 [IMDB Link]({movie['imdb_link']})\n"
+            f"🎭 [IMDB Search]({movie['imdb_link']})\n"
             f"📖 {movie['overview']}"  
         )
 
-        if SHOW_PICS and movie["poster_url"]:  # ✅ Agar SHOW_PICS = True hai toh Image Send Karega
-            await client.send_photo(message.chat.id, movie["poster_url"], caption=caption)
-        else:  # ✅ Agar SHOW_PICS = False hai toh Sirf Text Send Karega
-            await message.reply_text(caption)
+        await message.reply_text(caption)
 
     await reaction_message.delete()  # ✅ Pehle Wala Message Hata Dega
