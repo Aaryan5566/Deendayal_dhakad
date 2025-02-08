@@ -3,41 +3,68 @@ from pyrogram import Client, filters
 import random
 import time  
 
-# ✅ API Key
+# ✅ API Key & Configurations (Manually Replace)
 TMDB_API_KEY = "2937f761448c84e103d3ea8699d5a33c"
 
-# ✅ Function: Trending Movies Fetch
-def get_trending_movies():
-    url = f"https://api.themoviedb.org/3/trending/movie/day?api_key={TMDB_API_KEY}&language=en-US"
-    response = requests.get(url)
+# ✅ Function: Fetch 20 Upcoming Movies & Web Series
+def get_upcoming():
+    url_movies = f"https://api.themoviedb.org/3/movie/upcoming?api_key={TMDB_API_KEY}&language=en-US&page=1"
+    url_tv = f"https://api.themoviedb.org/3/tv/on_the_air?api_key={TMDB_API_KEY}&language=en-US&page=1"
 
-    if response.status_code == 200:
-        data = response.json()["results"][:40]  # Top 40 Trending Movies
-        trending_list = []
+    movies_response = requests.get(url_movies)
+    tv_response = requests.get(url_tv)
 
-        for index, movie in enumerate(data, start=1):
-            title = movie.get("title", "Unknown")
-            release_date = movie.get("release_date", "N/A")
-            language = movie.get("original_language", "N/A").upper()
-            imdb_id = movie.get("id")
-            imdb_link = f"https://www.imdb.com/title/tt{imdb_id}/" if imdb_id else "N/A"
+    upcoming_list = []
 
-            trending_list.append(f"**{index}. {title}**\n📅 Release Date: {release_date}\n🌍 Language: {language}\n🔗 [IMDB Link]({imdb_link})\n")
+    if movies_response.status_code == 200 and tv_response.status_code == 200:
+        movies = movies_response.json()["results"][:10]  # ✅ 10 Upcoming Movies
+        tv_shows = tv_response.json()["results"][:10]   # ✅ 10 Upcoming TV Series
 
-        return "\n".join(trending_list)
+        for movie in movies:
+            upcoming_list.append({
+                "title": movie.get("title", "Unknown"),
+                "release_date": movie.get("release_date", "N/A"),
+                "language": movie.get("original_language", "N/A").upper(),
+                "poster_url": f"https://image.tmdb.org/t/p/w500{movie['poster_path']}" if movie.get("poster_path") else None
+            })
+
+        for show in tv_shows:
+            upcoming_list.append({
+                "title": show.get("name", "Unknown"),
+                "release_date": show.get("first_air_date", "N/A"),
+                "language": show.get("original_language", "N/A").upper(),
+                "poster_url": f"https://image.tmdb.org/t/p/w500{show['poster_path']}" if show.get("poster_path") else None
+            })
+
+        return upcoming_list
     else:
-        return "❌ Error fetching trending movies."
+        return "❌ Error fetching upcoming movies & series."
 
-# ✅ Command: /movies
+# ✅ /movies Command Handler (Plugins Version)
 @Client.on_message(filters.command("movies"))
 async def movies_command(client, message):
     reactions = ["🔥", "🎬", "🍿", "💥", "⚡", "🚀", "🎞"]
     await message.react(random.choice(reactions))
 
-    msg = await message.reply_text("🎬 **Movies Ka Baap Aa Gaya!** 🍿\n🔥 Fetching trending movies...")
-
+    msg = await message.reply_text("🎬 **Upcoming Movies & Web Series Fetching...** 🍿")
+    
     time.sleep(4)
     await msg.delete()
 
-    trending_movies = get_trending_movies()
-    await message.reply_text(f"**🔥 40 Trending Movies:**\n\n{trending_movies}")
+    upcoming = get_upcoming()
+
+    if isinstance(upcoming, str):  # ❌ Agar Koi Error Aaye
+        await message.reply_text(upcoming)
+        return
+
+    for item in upcoming:
+        caption = (
+            f"🎬 **{item['title']}**\n"
+            f"📅 Release Date: {item['release_date']}\n"
+            f"🌍 Language: {item['language']}\n"
+        )
+
+        if item["poster_url"]:  # ✅ Agar Poster Hai Toh Image Send Karega
+            await client.send_photo(message.chat.id, item["poster_url"], caption=caption)
+        else:  # ❌ Agar Poster Nahi Hai Toh Sirf Text Send Karega
+            await message.reply_text(caption)
