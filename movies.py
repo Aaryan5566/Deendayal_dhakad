@@ -8,7 +8,7 @@ API_ID = "23378704"
 API_HASH = "15a02b4d02babeb79e8f328b0ead0c17"
 BOT_TOKEN = "7917351134:AAFz-wi0zC0PabOOPcWIydblZmkd51WYjWI"
 TMDB_API_KEY = "2937f761448c84e103d3ea8699d5a33c"
-SHOW_PICS = False  # True = Pics ON, False = Pics OFF
+SHOW_PICS = True  # True = Pics ON, False = Pics OFF
 
 app = Client("movie_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
