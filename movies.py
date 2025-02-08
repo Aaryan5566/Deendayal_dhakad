@@ -1,71 +1,62 @@
 import requests
-from pyrogram import Client, filters
 import random
 
-# ✅ Image Show ON/OFF (True = Image Show, False = Sirf Text)
-SHOW_PICS = True  
+# ✅ TMDb API Key (Yaha Apni API Key Dalna)
+TMDB_API_KEY = "YOUR_TMDB_API_KEY"
 
-# ✅ Trending Movies & Web Series Fetch Karne Ka Function (Google Search)
-def get_trending_movies():
-    search_url = "https://www.google.com/search?q=trending+movies+and+web+series"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-    response = requests.get(search_url, headers=headers)
+# ✅ Trending Movies Fetch Karne Ka Function
+def get_trending_movies(country_code):
+    url = f"https://api.themoviedb.org/3/trending/movie/day?api_key={TMDB_API_KEY}&language=en-US&region={country_code}"
+    response = requests.get(url)
 
     if response.status_code == 200:
-        from bs4 import BeautifulSoup
-        soup = BeautifulSoup(response.text, "html.parser")
-        movies = [movie.text for movie in soup.find_all("h3")][:10]  # ✅ Google Se Top 10 Movies/Web Series Fetch Karega
-
-        if not movies:
-            return "❌ No trending movies found."
-
-        trending_list = []
-        for index, title in enumerate(movies, start=1):
-            imdb_link = f"https://www.google.com/search?q={title.replace(' ', '+')}+IMDB"
-            trending_list.append({
-                "index": index,
-                "title": title,
-                "language": "🌍 Multiple Languages",
-                "release_date": "N/A",
-                "imdb_link": imdb_link,
-                "overview": "📖 No description available.",
-                "poster_url": None
-            })
-
-        return trending_list
+        data = response.json()
+        movies = data.get("results", [])[:5]  # Sirf Top 5 Movies
+        return movies if movies else f"❌ No trending movies found in {country_code}."
     else:
-        return "❌ Error fetching trending movies."
+        return f"❌ Error fetching movies for {country_code}."
 
-# ✅ /movies Command Handler (Root Version)
-@Client.on_message(filters.command("movies"))
-async def movies_command(client, message):
-    # 🎭 Multiple Reactions Lagayega
-    reactions = ["🤡", "🔥", "🎬", "🍿", "💥", "🎭"]
-    for emoji in reactions:
-        await message.react(emoji)
+# ✅ Trending Web Series Fetch Karne Ka Function
+def get_trending_web_series(country_code):
+    url = f"https://api.themoviedb.org/3/trending/tv/day?api_key={TMDB_API_KEY}&language=en-US&region={country_code}"
+    response = requests.get(url)
 
-    reaction_message = await message.reply_text(
-        "🎬 **Movie Ka Baap Aa Gaya! 🍿**\n"
-        "🔥 Hold tight... Tracking down the hottest trending movies & web series! 🚀"
-    )
+    if response.status_code == 200:
+        data = response.json()
+        web_series = data.get("results", [])[:5]  # Sirf Top 5 Web Series
+        return web_series if web_series else f"❌ No trending web series found in {country_code}."
+    else:
+        return f"❌ Error fetching web series for {country_code}."
 
-    movies = get_trending_movies()
+# ✅ India + USA Trending Content Fetch Karke Print Karega
+def fetch_trending():
+    reactions = ["🔥", "🎬", "🍿", "📺", "💥", "⚡", "🚀", "🎭"]
+    print(f"{random.choice(reactions)} **Movie Baap OP Aa Gaya! 🍿**\n")
 
-    if isinstance(movies, str):  # ✅ Agar Koi Error Aayi
-        await reaction_message.edit_text(f"❌ {movies}")
-        return
+    for country_code, country_name in [("IN", "India 🇮🇳"), ("US", "USA 🇺🇸")]:
+        movies = get_trending_movies(country_code)
+        web_series = get_trending_web_series(country_code)
 
-    for movie in movies:
-        caption = (
-            f"🎬 **{movie['title']}**\n"
-            f"🌍 Language: {movie['language']}\n"
-            f"📅 Release Date: {movie['release_date']}\n"
-            f"🎭 [IMDB Search]({movie['imdb_link']})\n"
-            f"📖 {movie['overview']}"  
-        )
+        print(f"📌 **{country_name} Trending Movies:**")
+        if isinstance(movies, str):
+            print(movies)
+        else:
+            for index, movie in enumerate(movies, start=1):
+                title = movie.get("title", "Unknown")
+                release_date = movie.get("release_date", "N/A")
+                print(f"{index}. **{title}** ({release_date})")
 
-        await message.reply_text(caption)
+        print(f"\n📺 **{country_name} Trending Web Series:**")
+        if isinstance(web_series, str):
+            print(web_series)
+        else:
+            for index, series in enumerate(web_series, start=1):
+                title = series.get("name", "Unknown")
+                first_air_date = series.get("first_air_date", "N/A")
+                print(f"{index}. **{title}** ({first_air_date})")
 
-    await reaction_message.delete()  # ✅ Pehle Wala Message Hata Dega
+        print("\n" + "-" * 40 + "\n")
+
+# ✅ Run the function
+if __name__ == "__main__":
+    fetch_trending()
