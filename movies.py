@@ -1,67 +1,73 @@
+import requests
 from pyrogram import Client, filters
 import random
 
-# 🎬 Manually Trending Movies & Web Series List
-TRENDING_MOVIES = [
-    {
-        "title": "Dune: Part Two",
-        "language": "English",
-        "release_date": "2024-03-01",
-        "imdb_link": "https://www.imdb.com/title/tt15239678/",
-        "overview": "Paul Atreides unites with Chani and the Fremen while seeking revenge against those who destroyed his family."
-    },
-    {
-        "title": "Joker: Folie à Deux",
-        "language": "English",
-        "release_date": "2024-10-04",
-        "imdb_link": "https://www.imdb.com/title/tt11389872/",
-        "overview": "A sequel to the 2019 film 'Joker' exploring the complicated relationship between Arthur Fleck and Harley Quinn."
-    }
-]
+# ✅ OMDb API Key (Yaha Apni API Key Dalna)
+OMDB_API_KEY = "223e6df"  
 
-TRENDING_WEB_SERIES = [
-    {
-        "title": "Squid Game: Season 2",
-        "language": "Korean",
-        "release_date": "2024",
-        "imdb_link": "https://www.imdb.com/title/tt10919420/",
-        "overview": "The deadly survival game returns with new contestants and even deadlier challenges."
-    },
-    {
-        "title": "House of the Dragon: Season 2",
-        "language": "English",
-        "release_date": "2024",
-        "imdb_link": "https://www.imdb.com/title/tt11198330/",
-        "overview": "The Targaryen civil war, the Dance of the Dragons, continues in Westeros."
-    }
-]
+# ✅ Image Show ON/OFF (True = Image Show, False = Sirf Text)
+SHOW_PICS = False  
 
-# ✅ /movies Command Handler
-@Client.on_message(filters.command("movies"))
-async def movies_command(client, message):
-    # 🎭 Multiple Reactions
-    reactions = ["🔥", "🎬", "🍿", "💥"]
-    await message.react(random.choice(reactions))
+# ✅ Trending Web Series Fetch Karne Ka Function
+def get_trending_web_series():
+    url = f"https://www.omdbapi.com/?s=series&type=series&apikey={OMDB_API_KEY}"
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        data = response.json()
+        series = data.get("Search", [])
+
+        if not series:
+            return "❌ No trending web series found."
+
+        trending_list = []
+        for index, show in enumerate(series[:5], start=1):  # Sirf Top 5 Web Series Show Karega
+            title = show.get("Title", "Unknown")
+            year = show.get("Year", "N/A")
+            imdb_id = show.get("imdbID", "")
+            imdb_link = f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else "N/A"
+            poster_url = show.get("Poster") if SHOW_PICS else None
+
+            trending_list.append({
+                "index": index,
+                "title": title,
+                "year": year,
+                "imdb_link": imdb_link,
+                "poster_url": poster_url
+            })
+
+        return trending_list
+    else:
+        return "❌ Error fetching trending web series."
+
+# ✅ /series Command Handler (Plugins Version)
+@Client.on_message(filters.command("series"))
+async def series_command(client, message):
+    # 🎭 Pehle Reaction & Message Send Karega
+    reaction_emojis = ["🔥", "📺", "🎭", "🎥", "⭐"]
+    await message.react(random.choice(reaction_emojis))
 
     reaction_message = await message.reply_text(
-        "🔥 **Movies Ka Baap Aa Gaya!** 🍿\n"
-        "🎬 Finding the latest trending movies & web series... 🚀"
+        "📺 **Web Series Ka Baap Aa Gaya! 🎭**\n"
+        "🔥 Hold tight... Fetching the latest trending web series! 🚀"
     )
 
-    msg_text = "🔥 **Trending Movies:**\n"
-    for movie in TRENDING_MOVIES:
-        msg_text += f"🎬 **{movie['title']}**\n"
-        msg_text += f"🌍 Language: {movie['language']}\n"
-        msg_text += f"📅 Release Date: {movie['release_date']}\n"
-        msg_text += f"🎭 [IMDB Link]({movie['imdb_link']})\n"
-        msg_text += f"📖 {movie['overview'][:200]}...\n\n"
+    series = get_trending_web_series()
 
-    msg_text += "\n🎭 **Trending Web Series:**\n"
-    for series in TRENDING_WEB_SERIES:
-        msg_text += f"📺 **{series['title']}**\n"
-        msg_text += f"🌍 Language: {series['language']}\n"
-        msg_text += f"📅 Release Date: {series['release_date']}\n"
-        msg_text += f"🎭 [IMDB Link]({series['imdb_link']})\n"
-        msg_text += f"📖 {series['overview'][:200]}...\n\n"
+    if isinstance(series, str):  # Agar Koi Error Aayi
+        await reaction_message.edit_text(f"❌ {series}")
+        return
 
-    await reaction_message.edit_text(msg_text)
+    for show in series:
+        caption = (
+            f"📺 **{show['title']}**\n"
+            f"📅 Year: {show['year']}\n"
+            f"🎭 [IMDB Link]({show['imdb_link']})"
+        )
+
+        if SHOW_PICS and show["poster_url"]:  # ✅ Agar SHOW_PICS = True hai toh Image Send Karega
+            await client.send_photo(message.chat.id, show["poster_url"], caption=caption)
+        else:  # ✅ Agar SHOW_PICS = False hai toh Sirf Text Send Karega
+            await message.reply_text(caption)
+
+    await reaction_message.delete()  # Pehle Wala Message Hata Dega
