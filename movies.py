@@ -2,79 +2,78 @@ import requests
 from pyrogram import Client, filters
 import random
 
-# ✅ Manually Add Your API Details Here
-API_ID = 23378704  # ⚠️ Yaha Apni API ID Dalna
-API_HASH = "15a02b4d02babeb79e8f328b0ead0c17"  # ⚠️ Yaha Apni API Hash Dalna
-BOT_TOKEN = "7917351134:AAFz-wi0zC0PabOOPcWIydblZmkd51WYjWI"  # ⚠️ Yaha Apna Bot Token Dalna
-OMDB_API_KEY = "223e6df"  # ⚠️ Yaha Apni OMDb API Key Dalna
+# ✅ Manually Add API & Bot Details
+API_ID = 23378704  # ⚠️ Yahan Apni API ID Dalna
+API_HASH = "15a02b4d02babeb79e8f328b0ead0c17"  # ⚠️ Yahan Apna API Hash Dalna
+BOT_TOKEN = "7917351134:AAFz-wi0zC0PabOOPcWIydblZmkd51WYjWI"  # ⚠️ Yahan Apna Bot Token Dalna
+TMDB_API_KEY = "2937f761448c84e103d3ea8699d5a33c"  # ⚠️ Yahan Apni TMDb API Key Dalna
+SHOW_PICS = False  # ✅ True = Images ON, False = Sirf Text
 
 # ✅ Pyrogram Client Setup
-app = Client("movies_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+app = Client("MovieBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# ✅ OMDb API Se Trending Movies & Web Series Fetch Karne Ka Function
-def get_trending_movies():
-    url = f"https://www.omdbapi.com/?s=movie&type=movie&apikey={OMDB_API_KEY}"
+# ✅ Trending Movies & Web Series Fetch Karne Ka Function
+def get_trending_content(content_type="movie"):
+    url = f"https://api.themoviedb.org/3/trending/{content_type}/day?api_key={TMDB_API_KEY}&language=en-US"
     response = requests.get(url)
 
     if response.status_code == 200:
         data = response.json()
-        movies = data.get("Search", [])
-        if not movies:
-            return "❌ No trending movies found."
+        content_list = data.get("results", [])
 
         trending_list = []
-        for index, movie in enumerate(movies[:5], start=1):  # Sirf Top 5 Movies
-            title = movie.get("Title", "Unknown")
-            year = movie.get("Year", "N/A")
-            imdb_id = movie.get("imdbID", "N/A")
-            imdb_link = f"https://www.imdb.com/title/{imdb_id}/"
-            
-            trending_list.append(f"🎬 **{index}. {title} ({year})**\n🎭 [IMDB Link]({imdb_link})\n")
+        for index, item in enumerate(content_list[:5], start=1):  # ✅ Sirf Top 5 Movies/Web Series Show Karega
+            title = item.get("title") or item.get("name") or "Unknown"
+            language = item.get("original_language", "N/A").upper()
+            release_date = item.get("release_date") or item.get("first_air_date") or "N/A"
+            imdb_id = item.get("id")
+            imdb_link = f"https://www.imdb.com/title/tt{imdb_id}/" if imdb_id else "N/A"
+            overview = item.get("overview", "No description available.")
+            poster_path = item.get("poster_path")
+            full_poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
 
-        return "\n".join(trending_list)
+            trending_list.append({
+                "index": index,
+                "title": title,
+                "language": language,
+                "release_date": release_date,
+                "imdb_link": imdb_link,
+                "overview": overview,
+                "poster_url": full_poster_url
+            })
+
+        return trending_list
     else:
-        return "❌ Error fetching movies."
-
-def get_trending_series():
-    url = f"https://www.omdbapi.com/?s=series&type=series&apikey={OMDB_API_KEY}"
-    response = requests.get(url)
-
-    if response.status_code == 200:
-        data = response.json()
-        series = data.get("Search", [])
-        if not series:
-            return "❌ No trending web series found."
-
-        trending_list = []
-        for index, show in enumerate(series[:5], start=1):  # Sirf Top 5 Series
-            title = show.get("Title", "Unknown")
-            year = show.get("Year", "N/A")
-            imdb_id = show.get("imdbID", "N/A")
-            imdb_link = f"https://www.imdb.com/title/{imdb_id}/"
-            
-            trending_list.append(f"📺 **{index}. {title} ({year})**\n🎭 [IMDB Link]({imdb_link})\n")
-
-        return "\n".join(trending_list)
-    else:
-        return "❌ Error fetching series."
+        return "❌ Error fetching trending content."
 
 # ✅ /movies Command Handler
 @app.on_message(filters.command("movies"))
 async def movies_command(client, message):
-    # 🔥 Multiple Reactions
-    reactions = ["🔥", "💥", "🤩", "🎬", "🍿"]
-    for reaction in reactions:
-        await message.react(reaction)
+    reaction_emoji = random.choice(["🤡", "🔥", "🎬", "🍿", "⚡"])
+    await message.react(reaction_emoji)
 
-    # 🎭 Custom "Movies ka Baap" Message
-    await message.reply_text("🎬 **Movies ka Baap Aa Gaya!** 🍿\n🔍 Fetching trending movies & web series...")
+    reaction_message = await message.reply_text(
+        "🎬 **Movie Ka Baap Aa Gaya! 🍿**\n"
+        "🔥 Hold tight... Fetching trending movies & web series! 🚀"
+    )
 
-    movies = get_trending_movies()
-    series = get_trending_series()
+    movies = get_trending_content("movie")
+    web_series = get_trending_content("tv")
 
-    trending_text = f"🔥 **Trending Movies:**\n{movies}\n\n🎭 **Trending Web Series:**\n{series}"
-    
-    await message.reply_text(trending_text)
+    if isinstance(movies, str) or isinstance(web_series, str):  
+        await reaction_message.edit_text("❌ Error fetching trending content.")
+        return
 
-# ✅ Bot Start Karega
+    text = "🔥 **Top 5 Trending Movies:**\n\n"
+    for movie in movies:
+        text += f"🎬 **{movie['title']}**\n🌍 Language: {movie['language']}\n📅 Release Date: {movie['release_date']}\n🎭 [IMDB]({movie['imdb_link']})\n📖 {movie['overview'][:200]}...\n\n"
+
+    text += "🎭 **Top 5 Trending Web Series:**\n\n"
+    for series in web_series:
+        text += f"📺 **{series['title']}**\n🌍 Language: {series['language']}\n📅 Release Date: {series['release_date']}\n🎭 [IMDB]({series['imdb_link']})\n📖 {series['overview'][:200]}...\n\n"
+
+    await reaction_message.edit_text(text)
+    await reaction_message.delete()
+
+# ✅ Bot Start
 app.run()
