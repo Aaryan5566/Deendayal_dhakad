@@ -1,5 +1,4 @@
 import requests
-import requests
 import asyncio
 import random
 import re
@@ -71,12 +70,16 @@ async def top_movies_command(client, message):
     await top_msg.delete()
 
 # ✅ /topmoviesYYYY Command - Top Movies & Web Series of a Specific Year
-@Client.on_message(filters.command(re.compile(r"topmovies(\d{4})")))
+@Client.on_message(filters.regex(r"^/topmovies(\d{4})$"))
 async def top_movies_year_command(client, message):
     reaction = random.choice(REACTIONS)
     await message.react(reaction)
 
-    year = int(message.matches[0].group(1))
+    year_match = re.match(r"^/topmovies(\d{4})$", message.text)
+    if not year_match:
+        return
+
+    year = int(year_match.group(1))
     msg = await message.reply_text(f"🎬 **Wait... Top IMDb Movies & Web Series for {year} Fetch Kar Raha Hoon! 🍿**")
     await asyncio.sleep(3)
 
