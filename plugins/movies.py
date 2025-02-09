@@ -3,7 +3,7 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import random
 
-# ✅ Google API Key और Search Engine ID (आपका डाला हुआ)
+# ✅ Google API Key और Search Engine ID
 GOOGLE_API_KEY = "AIzaSyCZgwU-gw-JEoX3TSW-8RKzWrklglhnGRg"
 SEARCH_ENGINE_ID = "066bb614cd7934839"
 
@@ -22,7 +22,8 @@ CATEGORIES = {
     "horror": "👻 Horror",
     "marvel": "🦸‍♂️ Marvel",
     "anime": "🎌 Anime",
-    "dc": "🦇 DC Movies"
+    "dc": "🦇 DC Movies",
+    "adult": "🔞 Adult"
 }
 
 # ✅ Google API से Movies Scrape करने का फ़ंक्शन
@@ -69,7 +70,7 @@ async def callback_handler(client, query):
     page = 0
     await show_movies(client, query.message, category, page, movies)
 
-# ✅ Show Movies with Pagination
+# ✅ Show Movies with Pagination (10 Buttons Per Page)
 async def show_movies(client, message, category, page, movies):
     total_pages = (len(movies) - 1) // 10 + 1  
     start_index = page * 10
@@ -79,7 +80,8 @@ async def show_movies(client, message, category, page, movies):
     buttons = []
     for movie in movies_list:
         title = movie["title"]
-        buttons.append([InlineKeyboardButton(f"🎬 {title}", url=movie["link"])])
+        link = movie["link"]
+        buttons.append([InlineKeyboardButton(f"🎬 {title}", url=link)])
 
     # Pagination बटन सेटअप
     nav_buttons = []
