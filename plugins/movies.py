@@ -28,15 +28,16 @@ CATEGORIES = {
 
 # ✅ Google API से IMDb Trending Movies Scrape करने का फ़ंक्शन
 def get_imdb_movies(category):
-    search_query = f"best {category} movies 2024 site:imdb.com"
+    search_query = f"top 10 {category} movies 2024 site:imdb.com"
     url = f"https://www.googleapis.com/customsearch/v1?q={search_query}&key={GOOGLE_API_KEY}&cx={SEARCH_ENGINE_ID}"
     response = requests.get(url)
     data = response.json()
 
     movies = []
-    for item in data.get("items", [])[:10]:  # 10 IMDb लिस्ट्स निकालें
-        list_url = item["link"]
-        movies.append({"title": item["title"], "link": list_url})
+    for item in data.get("items", [])[:100]:  # 100 Movies तक लाएं
+        title = item["title"].split("- IMDb")[0].strip()  # Extra Text हटाएं
+        link = item["link"]
+        movies.append({"title": title, "link": link})
 
     return movies
 
