@@ -28,16 +28,16 @@ CATEGORIES = {
 
 # ✅ Google API से IMDb Trending Movies Scrape करने का फ़ंक्शन
 def get_imdb_movies(category):
-    search_query = f"top {category} movies 2024 site:imdb.com"
+    search_query = f"top {category} movies site:imdb.com"
     url = f"https://www.googleapis.com/customsearch/v1?q={search_query}&key={GOOGLE_API_KEY}&cx={SEARCH_ENGINE_ID}"
     response = requests.get(url)
     data = response.json()
 
     movies = []
-    for item in data.get("items", [])[:20]:  # टॉप 20 मूवीज़ लें
+    for item in data.get("items", [])[:100]:  # 100 Movies तक लाएं
         title = item["title"].split(" - IMDb")[0].strip()  # Extra Text हटाएं
         link = item["link"]
-        snippet = item.get("snippet", "")  # IMDb रेटिंग निकालने के लिए
+        snippet = item.get("snippet", "")
 
         # ✅ IMDb Rating Extract करें
         rating = "N/A"
@@ -57,7 +57,7 @@ def get_imdb_movies(category):
 @Client.on_message(filters.command("watch"))
 async def watch_command(client, message):
     user_name = message.from_user.first_name
-    reaction = random.choice(REACTIONS)  # 🔥 Random Reaction
+    reaction = random.choice(REACTIONS)
 
     buttons = [[InlineKeyboardButton(emoji, callback_data=key)] for key, emoji in CATEGORIES.items()]
     buttons.append([InlineKeyboardButton("❌ Close", callback_data="close")])
