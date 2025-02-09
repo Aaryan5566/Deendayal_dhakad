@@ -6,20 +6,34 @@ import asyncio
 
 # ✅ Free Music Archive API URL
 FMA_API_URL = 'https://freemusicarchive.org/api/3/'
+# ✅ Jamendo API URL (example, for additional country-based search)
+JAMENDO_API_URL = 'https://api.jamendo.com/v3.0/tracks'
 
-# ✅ Fetch Song Info from Free Music Archive
-def get_fma_song_data(song_name):
+# ✅ Fetch Song from Free Music Archive
+def get_fma_song_data(song_name, country=None):
     search_url = f"{FMA_API_URL}tracks/search/?query={song_name}&limit=1"
+    if country:
+        search_url += f"&country={country}"
     response = requests.get(search_url).json()
-    
     if response.get('data'):
         song_data = response['data'][0]
-        download_url = song_data['file_url']  # Actual download link
-        song_image_url = song_data['album']['artwork_url'] if song_data['album'].get('artwork_url') else None
-        return download_url, song_image_url
-    return None, None
+        download_url = song_data['file_url']
+        return download_url
+    return None
 
-# ✅ /song Command - Get Song Download Link and Send File Directly
+# ✅ Fetch Song from Jamendo API (country-based)
+def get_jamendo_song_data(song_name, country=None):
+    search_url = f"{JAMENDO_API_URL}?name={song_name}&client_id=YOUR_CLIENT_ID"
+    if country:
+        search_url += f"&country={country}"
+    response = requests.get(search_url).json()
+    if response.get('results'):
+        song_data = response['results'][0]
+        download_url = song_data['url']
+        return download_url
+    return None
+
+# ✅ /song Command - Get Song Download Link from Multiple Sources
 @Client.on_message(filters.command("song"))
 async def song_command(client, message):
     reaction = random.choice(["🔥", "😍", "🎬", "🫡", "🍿"])
@@ -30,9 +44,14 @@ async def song_command(client, message):
         await message.reply_text("❌ Please provide a song name. Example: `/song Shape of You`")
         return
 
-    msg = await message.reply_text(f"🎶 **Searching for '{query[1]}' on Free Music Archive... 🍿**")
+    country = "IN"  # You can change country code based on user's input
+    msg = await message.reply_text(f"🎶 **Searching for '{query[1]}' in {country}... 🍿**")
     
-    download_url, song_image_url = get_fma_song_data(query[1])
+    # Search in Free Music Archive
+    download_url = get_fma_song_data(query[1], country)
+    if not download_url:
+        # If not found in FMA, try Jamendo
+        download_url = get_jamendo_song_data(query[1], country)
 
     if not download_url:
         await msg.edit_text("❌ Song not found.")
