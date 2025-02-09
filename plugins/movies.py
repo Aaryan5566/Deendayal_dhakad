@@ -1,8 +1,11 @@
 import requests
-from bs4 import BeautifulSoup
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import random
+
+# ✅ Google API Key और Search Engine ID (आपका डाला हुआ)
+GOOGLE_API_KEY = "AIzaSyCZgwU-gw-JEoX3TSW-8RKzWrklglhnGRg"
+SEARCH_ENGINE_ID = "066bb614cd7934839"
 
 # ✅ Random Reactions (🤡🫡🥰😇)
 REACTIONS = ["🤡", "🫡", "🥰", "😇"]
@@ -22,53 +25,20 @@ CATEGORIES = {
     "dc": "🦇 DC Movies"
 }
 
-# ✅ Google से IMDb Rating Scrape करने का फ़ंक्शन
-def get_imdb_rating(title):
-    search_url = f"https://www.google.com/search?q={title}+IMDb+rating"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(search_url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    rating = "N/A"
-    for span in soup.find_all("span"):
-        text = span.text.strip()
-        if "/10" in text:
-            rating = text
-            break
-
-    return rating
-
-# ✅ Google से Movies Scrape करने का फ़ंक्शन
+# ✅ Google API से Movies Scrape करने का फ़ंक्शन
 def get_movies(category):
-    search_query = category.replace(" ", "+") + "+movies"
-    search_url = f"https://www.google.com/search?q={search_query}"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(search_url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
+    search_query = f"{category} movies site:imdb.com"
+    url = f"https://www.googleapis.com/customsearch/v1?q={search_query}&key={GOOGLE_API_KEY}&cx={SEARCH_ENGINE_ID}"
+    response = requests.get(url)
+    data = response.json()
 
     movies = []
-    for result in soup.select("h3")[:100]:  # टॉप 100 मूवीज़ लें
-        title = result.text.strip()
-        rating = get_imdb_rating(title)
-        movies.append({"title": title, "rating": rating})
+    for item in data.get("items", [])[:100]:  # टॉप 100 मूवीज़ लें
+        title = item["title"].split(" - IMDb")[0]
+        link = item["link"]
+        movies.append({"title": title, "link": link})
 
     return movies
-
-# ✅ IMDb Rating के हिसाब से Emoji सेट करने का फ़ंक्शन
-def get_rating_emoji(rating):
-    try:
-        rating = float(rating.split("/")[0])
-    except:
-        return "🎬"
-
-    if rating >= 8:
-        return "🔥"
-    elif rating >= 7:
-        return "⭐"
-    elif rating >= 6:
-        return "👍"
-    else:
-        return "🎬"
 
 # ✅ "/watch" कमांड हैंडलर
 @Client.on_message(filters.command("watch"))
@@ -99,7 +69,7 @@ async def callback_handler(client, query):
     page = 0
     await show_movies(client, query.message, category, page, movies)
 
-# ✅ Show Movies with Pagination + IMDb Rating + Emoji
+# ✅ Show Movies with Pagination
 async def show_movies(client, message, category, page, movies):
     total_pages = (len(movies) - 1) // 10 + 1  
     start_index = page * 10
@@ -109,9 +79,7 @@ async def show_movies(client, message, category, page, movies):
     buttons = []
     for movie in movies_list:
         title = movie["title"]
-        imdb_rating = movie["rating"]
-        emoji = get_rating_emoji(imdb_rating)
-        buttons.append([InlineKeyboardButton(f"{emoji} {imdb_rating} | {title}", switch_inline_query_current_chat=title)])
+        buttons.append([InlineKeyboardButton(f"🎬 {title}", url=movie["link"])])
 
     # Pagination बटन सेटअप
     nav_buttons = []
@@ -123,7 +91,7 @@ async def show_movies(client, message, category, page, movies):
 
     buttons.append(nav_buttons) if nav_buttons else None
     await message.edit_text(
-        text=f"🎬 **Top {CATEGORIES[category]} (Page {page+1}):**",
+        text=f"🎬 **Top {CATEGORIES[category]} Movies (Page {page+1}):**",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
