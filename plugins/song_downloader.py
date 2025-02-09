@@ -1,9 +1,12 @@
 import os
-import os
 import asyncio
 from yt_dlp import YoutubeDL
 from pyrogram import Client, filters
 from pyrogram.types import Message
+
+# डाउनलोड्स फोल्डर बना दो
+if not os.path.exists("downloads"):
+    os.makedirs("downloads")
 
 # YouTube से ऑडियो डाउनलोड करने का function
 async def download_audio(query):
@@ -18,11 +21,14 @@ async def download_audio(query):
         "quiet": True
     }
     
-    with YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(f"ytsearch:{query}", download=True)
-        file_path = ydl.prepare_filename(info['entries'][0])
-        file_path = file_path.replace(".webm", ".mp3").replace(".m4a", ".mp3")
-        return file_path, info['entries'][0]['title']
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch:{query}", download=True)
+            file_path = ydl.prepare_filename(info['entries'][0])
+            file_path = file_path.replace(".webm", ".mp3").replace(".m4a", ".mp3")
+            return file_path, info['entries'][0]['title']
+    except Exception as e:
+        return None, str(e)
 
 # Telegram command handler
 @Client.on_message(filters.command("song") & filters.private)
@@ -33,10 +39,14 @@ async def song(client: Client, message: Message):
 
     msg = await message.reply_text(f"🔍 **Searching for:** `{query}`")
     
-    try:
-        file_path, title = await download_audio(query)
-        await msg.edit_text("📥 **Uploading song...**")
+    file_path, title = await download_audio(query)
 
+    if not file_path:
+        return await msg.edit_text(f"❌ **Download Failed:** {title}")
+
+    await msg.edit_text("📥 **Uploading song...**")
+
+    try:
         await message.reply_audio(
             audio=file_path,
             title=title,
@@ -49,4 +59,4 @@ async def song(client: Client, message: Message):
         await msg.delete()
 
     except Exception as e:
-        await msg.edit_text(f"❌ **Error:** {e}")
+        await msg.edit_text(f"❌ **Upload Error:** {e}")
