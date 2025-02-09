@@ -1,56 +1,52 @@
 import os
-import requests
-from pyrogram import Client, filters
+import os
+import asyncio
 from yt_dlp import YoutubeDL
-from youtube_search import YoutubeSearch
+from pyrogram import Client, filters
+from pyrogram.types import Message
 
-@Client.on_message(filters.command(['song', 'mp3']) & filters.private)
-async def song(client, message):
-    query = ' '.join(message.command[1:])
+# YouTube से ऑडियो डाउनलोड करने का function
+async def download_audio(query):
+    ydl_opts = {
+        "format": "bestaudio/best",
+        "outtmpl": "downloads/%(title)s.%(ext)s",
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "320"
+        }],
+        "quiet": True
+    }
+    
+    with YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(f"ytsearch:{query}", download=True)
+        file_path = ydl.prepare_filename(info['entries'][0])
+        file_path = file_path.replace(".webm", ".mp3").replace(".m4a", ".mp3")
+        return file_path, info['entries'][0]['title']
+
+# Telegram command handler
+@Client.on_message(filters.command("song") & filters.private)
+async def song(client: Client, message: Message):
+    query = " ".join(message.command[1:])
     if not query:
-        await message.reply("कृपया गाने का नाम प्रदान करें। उदाहरण: /song हुमनवा मेरे")
-        return
+        return await message.reply_text("**Usage:** `/song <song name>`")
 
-    m = await message.reply("आपके गाने की खोज की जा रही है...")
-
+    msg = await message.reply_text(f"🔍 **Searching for:** `{query}`")
+    
     try:
-        results = YoutubeSearch(query, max_results=1).to_dict()
-        if not results:
-            await m.edit("कोई परिणाम नहीं मिला। कृपया अन्य कीवर्ड आज़माएं।")
-            return
-
-        link = f"https://youtube.com{results[0]['url_suffix']}"
-        title = results[0]["title"][:40]
-        thumbnail = results[0]["thumbnails"][0]
-        duration = results[0]["duration"]
-
-        ydl_opts = {
-            "format": "bestaudio/best",
-            "outtmpl": f"{title}.mp3",
-            "quiet": True,
-            "postprocessors": [{
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192",
-            }],
-        }
-
-        await m.edit("गाना डाउनलोड किया जा रहा है...")
-
-        with YoutubeDL(ydl_opts) as ydl:
-            ydl.download([link])
+        file_path, title = await download_audio(query)
+        await msg.edit_text("📥 **Uploading song...**")
 
         await message.reply_audio(
-            audio=f"{title}.mp3",
+            audio=file_path,
             title=title,
             performer="YouTube",
-            duration=sum(int(x) * 60 ** i for i, x in enumerate(reversed(duration.split(':')))),
-            thumb=thumbnail,
-            caption=f"{title}\n{link}"
+            caption=f"🎵 **Title:** {title}",
+            duration=0
         )
 
-        os.remove(f"{title}.mp3")
-        await m.delete()
+        os.remove(file_path)  # डाउनलोड की हुई फाइल डिलीट कर दें
+        await msg.delete()
 
     except Exception as e:
-        await m.edit(f"कुछ गलत हो गया: {e}")
+        await msg.edit_text(f"❌ **Error:** {e}")
