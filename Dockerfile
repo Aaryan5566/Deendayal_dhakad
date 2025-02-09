@@ -1,15 +1,22 @@
 
-FROM python:3.10.8
-RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+# Lightweight Python Image Use Karo
+FROM python:3.10-slim
 
+# System Packages Install Karna
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
+# Working Directory Set Karna
 WORKDIR /Deendayal_botz
-COPY . /Deendayal_botz/
 
-RUN chmod +x /Deendayal_botz/start.sh
+# Source Code Copy Karna
+COPY . .
 
-RUN pip3 install --no-cache-dir -U pip --root-user-action=ignore && \
-    pip3 install --no-cache-dir -U -r requirements.txt --root-user-action=ignore
+# Permissions Fix
+RUN chmod +x start.sh
 
-CMD ["/bin/bash", "./start.sh"]
+# Python Dependencies Install Karna
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-
+# Bot Start Karna
+CMD ["bash", "./start.sh"]
