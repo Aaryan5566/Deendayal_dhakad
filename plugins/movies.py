@@ -3,14 +3,24 @@ from bs4 import BeautifulSoup
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import random
-import asyncio
 
 # ✅ Random Reactions (🤡🫡🥰😇)
 REACTIONS = ["🤡", "🫡", "🥰", "😇"]
 
-# ✅ Cached Data (Auto-Update के लिए)
-MOVIES_CACHE = []
-SERIES_CACHE = []
+# ✅ Categories with Emojis
+CATEGORIES = {
+    "trending": "🔥 Trending",
+    "mustwatch": "🌟 Must Watch",
+    "hollywood": "🎬 Hollywood",
+    "bollywood": "🇮🇳 Bollywood",
+    "scifi": "🚀 Sci-Fi",
+    "series": "📺 Series",
+    "comedy": "😂 Comedy",
+    "horror": "👻 Horror",
+    "marvel": "🦸‍♂️ Marvel",
+    "anime": "🎌 Anime",
+    "dc": "🦇 DC Movies"
+}
 
 # ✅ Google से IMDb Rating Scrape करने का फ़ंक्शन
 def get_imdb_rating(title):
@@ -28,20 +38,21 @@ def get_imdb_rating(title):
 
     return rating
 
-# ✅ Movies और Series ऑटो-अपडेट करने का फ़ंक्शन (हर 24 घंटे में)
-async def auto_update():
-    global MOVIES_CACHE, SERIES_CACHE
-    while True:
-        print("🔄 Updating Movies & Series Data...")
+# ✅ Google से Movies Scrape करने का फ़ंक्शन
+def get_movies(category):
+    search_query = category.replace(" ", "+") + "+movies"
+    search_url = f"https://www.google.com/search?q={search_query}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(search_url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
 
-        movie_titles = ["Inception", "The Dark Knight", "Interstellar", "Fight Club", "Forrest Gump"]
-        series_titles = ["Breaking Bad", "Game of Thrones", "Chernobyl", "Stranger Things", "The Witcher"]
+    movies = []
+    for result in soup.select("h3")[:100]:  # टॉप 100 मूवीज़ लें
+        title = result.text.strip()
+        rating = get_imdb_rating(title)
+        movies.append({"title": title, "rating": rating})
 
-        MOVIES_CACHE = [{"title": title, "rating": get_imdb_rating(title)} for title in movie_titles]
-        SERIES_CACHE = [{"title": title, "rating": get_imdb_rating(title)} for title in series_titles]
-
-        print("✅ Data Updated Successfully!")
-        await asyncio.sleep(86400)  # 24 घंटे बाद फिर अपडेट होगा
+    return movies
 
 # ✅ IMDb Rating के हिसाब से Emoji सेट करने का फ़ंक्शन
 def get_rating_emoji(rating):
@@ -65,11 +76,8 @@ async def watch_command(client, message):
     user_name = message.from_user.first_name
     reaction = random.choice(REACTIONS)  # 🔥 Random Reaction
 
-    buttons = [
-        [InlineKeyboardButton("🎬 Top Movies", callback_data="movies"),
-         InlineKeyboardButton("📺 Top Series", callback_data="series")],
-        [InlineKeyboardButton("❌ Close", callback_data="close")]
-    ]
+    buttons = [[InlineKeyboardButton(emoji, callback_data=key)] for key, emoji in CATEGORIES.items()]
+    buttons.append([InlineKeyboardButton("❌ Close", callback_data="close")])
     
     # ✅ Reaction + Category Buttons
     await message.react(reaction)
@@ -87,7 +95,7 @@ async def callback_handler(client, query):
         await query.message.delete()
         return
 
-    movies = MOVIES_CACHE if category == "movies" else SERIES_CACHE
+    movies = get_movies(category)
     page = 0
     await show_movies(client, query.message, category, page, movies)
 
@@ -115,7 +123,7 @@ async def show_movies(client, message, category, page, movies):
 
     buttons.append(nav_buttons) if nav_buttons else None
     await message.edit_text(
-        text=f"🎬 **Top {category.capitalize()} (Page {page+1}):**",
+        text=f"🎬 **Top {CATEGORIES[category]} (Page {page+1}):**",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
@@ -124,14 +132,10 @@ async def show_movies(client, message, category, page, movies):
 async def pagination_handler(client, query):
     category, action, page = query.data.rsplit("_", 2)
     page = int(page)
-    movies = MOVIES_CACHE if category == "movies" else SERIES_CACHE
+    movies = get_movies(category)
     await show_movies(client, query.message, category, page, movies)
 
 # ✅ Main Menu Handler
 @Client.on_callback_query(filters.regex("main_menu"))
 async def main_menu_handler(client, query):
     await watch_command(client, query.message)
-
-# ✅ Auto-Update Task Start करें
-async def start_auto_update():
-    asyncio.create_task(auto_update())
