@@ -28,16 +28,28 @@ CATEGORIES = {
 
 # ✅ Google API से IMDb Trending Movies Scrape करने का फ़ंक्शन
 def get_imdb_movies(category):
-    search_query = f"top 10 {category} movies 2024 site:imdb.com"
+    search_query = f"top {category} movies 2024 site:imdb.com"
     url = f"https://www.googleapis.com/customsearch/v1?q={search_query}&key={GOOGLE_API_KEY}&cx={SEARCH_ENGINE_ID}"
     response = requests.get(url)
     data = response.json()
 
     movies = []
-    for item in data.get("items", [])[:100]:  # 100 Movies तक लाएं
-        title = item["title"].split("- IMDb")[0].strip()  # Extra Text हटाएं
+    for item in data.get("items", [])[:20]:  # टॉप 20 मूवीज़ लें
+        title = item["title"].split(" - IMDb")[0].strip()  # Extra Text हटाएं
         link = item["link"]
-        movies.append({"title": title, "link": link})
+        snippet = item.get("snippet", "")  # IMDb रेटिंग निकालने के लिए
+
+        # ✅ IMDb Rating Extract करें
+        rating = "N/A"
+        if "IMDb" in snippet:
+            try:
+                rating = snippet.split("IMDb")[0].split()[-1]
+                if not rating.replace(".", "").isdigit():
+                    rating = "N/A"
+            except:
+                rating = "N/A"
+
+        movies.append({"title": title, "rating": rating, "link": link})
 
     return movies
 
@@ -80,8 +92,9 @@ async def show_movies(client, message, category, page, movies):
     buttons = []
     for movie in movies_list:
         title = movie["title"]
+        rating = movie["rating"]
         link = movie["link"]
-        buttons.append([InlineKeyboardButton(f"🎬 {title}", url=link)])
+        buttons.append([InlineKeyboardButton(f"⭐ {rating} | {title}", url=link)])
 
     # Pagination बटन सेटअप
     nav_buttons = []
