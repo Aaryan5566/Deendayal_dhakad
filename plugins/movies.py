@@ -3,9 +3,12 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import random
 
-# ✅ Google API Key और Search Engine ID
-GOOGLE_API_KEY = "AIzaSyCZgwU-gw-JEoX3TSW-8RKzWrklglhnGRg"
-SEARCH_ENGINE_ID = "066bb614cd7934839"
+# ✅ Google API Key और Search Engine ID (आपका API Data)
+GOOGLE_API_KEY = "AIzaSyCOU_1R97pHgzDr7JgOhuNgvleFA2Bf0Go"
+SEARCH_ENGINE_ID = "e2478349016e44cc9"
+
+# ✅ TMDb API Backup (अगर IMDb डेटा नहीं आता)
+TMDB_API_KEY = "YOUR_TMDB_API_KEY"
 
 # ✅ Random Reactions (🤡🫡🥰😇)
 REACTIONS = ["🤡", "🫡", "🥰", "😇"]
@@ -26,17 +29,30 @@ CATEGORIES = {
     "adult": "🔞 Adult"
 }
 
-# ✅ Google API से Movies Scrape करने का फ़ंक्शन
-def get_movies(category):
-    search_query = f"{category} movies site:imdb.com"
+# ✅ Google API से IMDb Trending Movies Scrape करने का फ़ंक्शन
+def get_imdb_movies(category):
+    search_query = f"best {category} movies 2024 site:imdb.com"
     url = f"https://www.googleapis.com/customsearch/v1?q={search_query}&key={GOOGLE_API_KEY}&cx={SEARCH_ENGINE_ID}"
     response = requests.get(url)
     data = response.json()
 
     movies = []
-    for item in data.get("items", [])[:100]:  # टॉप 100 मूवीज़ लें
-        title = item["title"].split(" - IMDb")[0]
-        link = item["link"]
+    for item in data.get("items", [])[:10]:  # 10 IMDb लिस्ट्स निकालें
+        list_url = item["link"]
+        movies.append({"title": item["title"], "link": list_url})
+
+    return movies
+
+# ✅ TMDb API Backup से Movies लाने का फ़ंक्शन
+def get_tmdb_movies():
+    url = f"https://api.themoviedb.org/3/trending/movie/week?api_key={TMDB_API_KEY}"
+    response = requests.get(url)
+    data = response.json()
+
+    movies = []
+    for movie in data.get("results", [])[:10]:
+        title = movie["title"]
+        link = f"https://www.imdb.com/title/{movie['id']}/"
         movies.append({"title": title, "link": link})
 
     return movies
@@ -66,7 +82,10 @@ async def callback_handler(client, query):
         await query.message.delete()
         return
 
-    movies = get_movies(category)
+    movies = get_imdb_movies(category)
+    if not movies:
+        movies = get_tmdb_movies()  # IMDb डेटा नहीं मिला, तो TMDb API से लें
+
     page = 0
     await show_movies(client, query.message, category, page, movies)
 
@@ -102,7 +121,10 @@ async def show_movies(client, message, category, page, movies):
 async def pagination_handler(client, query):
     category, action, page = query.data.rsplit("_", 2)
     page = int(page)
-    movies = get_movies(category)
+    movies = get_imdb_movies(category)
+    if not movies:
+        movies = get_tmdb_movies()  # IMDb डेटा नहीं मिला, तो TMDb API से लें
+
     await show_movies(client, query.message, category, page, movies)
 
 # ✅ Main Menu Handler
