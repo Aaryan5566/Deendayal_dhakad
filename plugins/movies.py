@@ -1,114 +1,137 @@
 import requests
-from bs4 import BeautifulSoup
-from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-import random
+from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, CallbackContext, CallbackQueryHandler
+from datetime import datetime, timedelta
+import threading
+import time
 
-# ✅ Random Reactions (🤡🫡🥰😇)
-REACTIONS = ["🤡", "🫡", "🥰", "😇"]
+# Telegram Bot Token aur Google API Key
+BOT_TOKEN = '7917351134:AAFz-wi0zC0PabOOPcWIydblZmkd51WYjWI'
+GOOGLE_API_KEY = 'AIzaSyCOU_1R97pHgzDr7JgOhuNgvleFA2Bf0Go'
+CX = 'e2478349016e44cc9'  # Google Custom Search Engine ID
+CHANNEL_ID = '-1002393373626'  # Telegram channel ID
 
-# ✅ Categories with IMDb URLs
-CATEGORIES = {
-    "trending": ("🔥 Trending", "https://www.imdb.com/chart/moviemeter/"),
-    "mustwatch": ("🌟 Must Watch", "https://www.imdb.com/chart/top/"),
-    "hollywood": ("🎬 Hollywood", "https://www.imdb.com/search/title/?title_type=feature&languages=en"),
-    "bollywood": ("🇮🇳 Bollywood", "https://www.imdb.com/search/title/?title_type=feature&languages=hi"),
-    "scifi": ("🚀 Sci-Fi", "https://www.imdb.com/search/title/?genres=sci-fi"),
-    "series": ("📺 Series", "https://www.imdb.com/chart/toptv/"),
-    "comedy": ("😂 Comedy", "https://www.imdb.com/search/title/?genres=comedy"),
-    "horror": ("👻 Horror", "https://www.imdb.com/search/title/?genres=horror"),
-    "marvel": ("🦸‍♂️ Marvel", "https://www.imdb.com/search/title/?keywords=marvel-cinematic-universe"),
-    "anime": ("🎌 Anime", "https://www.imdb.com/search/title/?genres=animation"),
-    "dc": ("🦇 DC Movies", "https://www.imdb.com/search/title/?keywords=dc-comics"),
-    "adult": ("🔞 Adult", "https://www.imdb.com/search/title/?genres=adult"),
-}
+# ✅ Function: Get Movie/Series/TV Show Details using Google API
+def get_movie_details(query):
+    url = f"https://www.googleapis.com/customsearch/v1?q={query}+movie+details&key={GOOGLE_API_KEY}&cx={CX}"
+    response = requests.get(url).json()
 
-# ✅ IMDb Scraping Function
-def get_imdb_movies(category):
-    category_name, url = CATEGORIES.get(category, ("Unknown", ""))
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
+    if 'items' in response:
+        item = response['items'][0]
+        pagemap = item.get('pagemap', {})
 
-    movies = []
-    movie_items = soup.find_all("td", class_="titleColumn")[:100]  # 100 Movies Scrape करें
-    ratings = soup.find_all("td", class_="ratingColumn imdbRating")
+        title = item.get('title', 'N/A')
+        snippet = item.get('snippet', 'N/A')
+        image = pagemap.get('cse_image', [{}])[0].get('src', None)
+        release_date = datetime.now().strftime("%Y-%m-%d")  # Placeholder
+        imdb_rating = "8.5 ⭐"  # Placeholder (you can enhance this)
 
-    for i in range(len(movie_items)):
-        title = movie_items[i].a.text.strip()
-        link = "https://www.imdb.com" + movie_items[i].a["href"]
-        rating = ratings[i].strong.text.strip() if ratings[i].strong else "N/A"
+        details = f"""
+🤡 🥰 😇 🫡
 
-        movies.append({"title": title, "rating": rating, "link": link})
+*🎬 Name:* {title}
+*📅 Release Date:* {release_date}
+*⭐ IMDb Rating:* {imdb_rating}
+*📝 Story:* {snippet}
+"""
+        return details, image
+    else:
+        return "🚫 Details not found!", None
 
-    return movies
-
-# ✅ "/watch" Command Handler
-@Client.on_message(filters.command("watch"))
-async def watch_command(client, message):
-    user_name = message.from_user.first_name
-    reaction = random.choice(REACTIONS)
-
-    buttons = [[InlineKeyboardButton(emoji, callback_data=key)] for key, (emoji, _) in CATEGORIES.items()]
-    buttons.append([InlineKeyboardButton("❌ Close", callback_data="close")])
-
-    # ✅ Reaction + Category Buttons
-    await message.react(reaction)
-    await message.reply_text(
-        f"👋 **Hey {user_name}**\n\n🎥 Cʜᴏᴏsᴇ Pʀᴇғᴇʀʀᴇᴅ Cᴀᴛᴇɢᴏʀʏ:",
-        reply_markup=InlineKeyboardMarkup(buttons)
-    )
-
-# ✅ Callback Query Handler
-@Client.on_callback_query()
-async def callback_handler(client, query):
-    category = query.data
-
-    if category == "close":
-        await query.message.delete()
+# ✅ /movie_details Command
+def movie_details(update: Update, context: CallbackContext):
+    if len(context.args) == 0:
+        update.message.reply_text("❗ Usage: /movie_details <movie/web series/TV show name>")
         return
 
-    movies = get_imdb_movies(category)
-    page = 0
-    await show_movies(client, query.message, category, page, movies)
+    query = ' '.join(context.args)
+    details, image = get_movie_details(query)
 
-# ✅ Show Movies with Pagination (10 Buttons Per Page)
-async def show_movies(client, message, category, page, movies):
-    total_pages = (len(movies) - 1) // 10 + 1  
-    start_index = page * 10
-    end_index = start_index + 10
-    movies_list = movies[start_index:end_index]
+    if image:
+        message = update.message.reply_photo(photo=image, caption=details, parse_mode='Markdown')
+    else:
+        message = update.message.reply_text(details, parse_mode='Markdown')
 
-    buttons = []
-    for movie in movies_list:
-        title = movie["title"]
-        rating = movie["rating"]
-        link = movie["link"]
-        buttons.append([InlineKeyboardButton(f"⭐ {rating} | {title}", url=link)])
+    # ⏱️ Auto-delete after 20 minutes
+    threading.Timer(1200, lambda: context.bot.delete_message(chat_id=update.message.chat_id, message_id=message.message_id)).start()
 
-    # Pagination बटन सेटअप
-    nav_buttons = []
-    if page > 0:
-        nav_buttons.append(InlineKeyboardButton("⬅️ Back", callback_data=f"{category}_prev_{page-1}"))
-    nav_buttons.append(InlineKeyboardButton(f"🏠 {page+1}/{total_pages}", callback_data="main_menu"))
-    if page < total_pages - 1:
-        nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"{category}_next_{page+1}"))
+# ✅ Function: Get Trending Movies (Google API Based)
+def get_trending_movies():
+    url = f"https://www.googleapis.com/customsearch/v1?q=trending+movies+2025&key={GOOGLE_API_KEY}&cx={CX}"
+    response = requests.get(url).json()
 
-    buttons.append(nav_buttons) if nav_buttons else None
-    await message.edit_text(
-        text=f"🎬 **Top {CATEGORIES[category][0]} Movies (Page {page+1}):**",
-        reply_markup=InlineKeyboardMarkup(buttons)
-    )
+    trending_list = []
+    if 'items' in response:
+        for item in response['items'][:5]:  # Top 5 trending movies
+            title = item.get('title')
+            trending_list.append(title)
+    return trending_list
 
-# ✅ Pagination Handlers
-@Client.on_callback_query(filters.regex(r"^(.*)_(prev|next)_(\d+)$"))
-async def pagination_handler(client, query):
-    category, action, page = query.data.rsplit("_", 2)
-    page = int(page)
-    movies = get_imdb_movies(category)
-    await show_movies(client, query.message, category, page, movies)
+# ✅ /watch Command
+def watch(update: Update, context: CallbackContext):
+    trending_movies = get_trending_movies()
 
-# ✅ Main Menu Handler
-@Client.on_callback_query(filters.regex("main_menu"))
-async def main_menu_handler(client, query):
-    await watch_command(client, query.message)
+    if not trending_movies:
+        update.message.reply_text("🚫 No trending movies found at the moment.")
+        return
+
+    keyboard = [[InlineKeyboardButton(movie, callback_data=movie)] for movie in trending_movies]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    update.message.reply_text('🎥 *Trending Movies & Series:*', reply_markup=reply_markup, parse_mode='Markdown')
+
+# ✅ Button Click Handler
+def button_handler(update: Update, context: CallbackContext):
+    query = update.callback_query
+    query.answer()
+
+    movie_name = query.data
+    details, image = get_movie_details(movie_name)
+
+    if image:
+        query.message.reply_photo(photo=image, caption=details, parse_mode='Markdown')
+    else:
+        query.message.reply_text(details, parse_mode='Markdown')
+
+# ✅ Automatic Daily Updates for New Releases
+def schedule_daily_updates():
+    while True:
+        now = datetime.now()
+        target_time = now.replace(hour=9, minute=0, second=0, microsecond=0)  # Daily at 9 AM
+        if now > target_time:
+            target_time += timedelta(days=1)
+
+        time.sleep((target_time - now).total_seconds())
+
+        # Fetch daily new releases
+        url = f"https://www.googleapis.com/customsearch/v1?q=new+movie+releases+today&key={GOOGLE_API_KEY}&cx={CX}"
+        response = requests.get(url).json()
+
+        if 'items' in response:
+            message = "🎬 *Today's New Releases:*\n"
+            for item in response['items'][:5]:  # Top 5 releases
+                title = item.get('title')
+                snippet = item.get('snippet')
+                message += f"\n• *{title}*\n📝 {snippet}\n"
+
+            bot.send_message(chat_id=CHANNEL_ID, text=message, parse_mode='Markdown')
+
+# ✅ Main Function
+def main():
+    global bot
+    bot = Bot(token=BOT_TOKEN)
+    updater = Updater(BOT_TOKEN, use_context=True)
+    dp = updater.dispatcher
+
+    dp.add_handler(CommandHandler("movie_details", movie_details))
+    dp.add_handler(CommandHandler("watch", watch))
+    dp.add_handler(CallbackQueryHandler(button_handler))
+
+    # Start daily update scheduler
+    threading.Thread(target=schedule_daily_updates, daemon=True).start()
+
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == '__main__':
+    main()
