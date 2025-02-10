@@ -1,100 +1,43 @@
-import json
 import requests
-from datetime import datetime, timedelta
-from threading import Timer
+from pyrogram import Client, filters
 
-# TMDb API key
-TMDB_API_KEY = "2937f761448c84e103d3ea8699d5a33c"
+# Bot Configuration (Make sure this matches your bot's settings)
+API_ID = 123456  # Replace with your API ID
+API_HASH = "your_api_hash_here"  # Replace with your API Hash
+BOT_TOKEN = "your_bot_token_here"  # Replace with your Bot Token
 
-# Random Emojis
-EMOJIS = ['🤡', '🥰', '😇', '🫡']
+# Initialize Pyrogram Client
+app = Client("MovieBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-def get_movie_details(query):
-    url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={query}"
-    response = requests.get(url)
-    if response.status_code != 200:
-        return None
-    data = response.json()
+# IMDb API URL (Unofficial API for fetching latest movies)
+IMDB_API_URL = "https://imdb-api.projects.thetuhin.com/top/new_movies"
 
-    if not data['results']:
-        return None
+# Command to fetch latest movies
+@app.on_message(filters.command("movies") & filters.private)
+async def fetch_latest_movies(client, message):
+    try:
+        await message.reply("🔍 Fetching latest movies from IMDb... Please wait!")
 
-    movie = data['results'][0]
-    movie_id = movie['id']
+        response = requests.get(IMDB_API_URL).json()
 
-    # Fetching movie details
-    details_url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key={TMDB_API_KEY}"
-    details_response = requests.get(details_url)
-    if details_response.status_code != 200:
-        return None
-    details = details_response.json()
+        if "data" in response and isinstance(response["data"], list):
+            movies_list = response["data"][:10]  # Get top 10 new release movies
+            movies_text = "**🎬 Latest IMDb Releases:**\n\n"
 
-    title = details.get('title', 'N/A')
-    release_date = details.get('release_date', 'N/A')
-    overview = details.get('overview', 'No story available.')
-    rating = details.get('vote_average', 'N/A')
-    poster_path = details.get('poster_path', '')
+            for movie in movies_list:
+                title = movie.get("title", "Unknown")
+                year = movie.get("year", "N/A")
+                rating = movie.get("rating", "N/A")
+                movies_text += f"🎥 **{title}** ({year}) - ⭐ {rating}\n"
 
-    poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
+            await message.reply(movies_text)
+        else:
+            await message.reply("🚫 Failed to fetch movie data. Try again later!")
 
-    return {
-        'title': title,
-        'release_date': release_date,
-        'overview': overview,
-        'rating': rating,
-        'poster_url': poster_url
-    }
+    except Exception as e:
+        await message.reply(f"❌ Error fetching movies: {e}")
 
-def delete_message_after_delay(bot, chat_id, message_id, delay=1200):
-    Timer(delay, lambda: bot.delete_message(chat_id, message_id)).start()
-
-def movie_details_handler(bot, update):
-    message = update.get('message', {})
-    chat_id = message.get('chat', {}).get('id')
-    text = message.get('text', '')
-
-    if not text.startswith('/movie_details'):
-        return
-
-    query = text.replace('/movie_details', '').strip()
-    if not query:
-        bot.send_message(chat_id, "कृपया मूवी का नाम लिखें जैसे:\n`/movie_details Inception`", parse_mode="Markdown")
-        return
-
-    details = get_movie_details(query)
-    if not details:
-        bot.send_message(chat_id, "मूवी नहीं मिली। कृपया सही नाम दर्ज करें।")
-        return
-
-    emoji = f"**{EMOJIS[datetime.now().second % len(EMOJIS)]}**"
-
-    caption = f"""{emoji}
-
-**🎬 नाम:** {details['title']}
-**📅 रिलीज डेट:** {details['release_date']}
-**⭐ IMDb रेटिंग:** {details['rating']}
-**📝 कहानी:** {details['overview']}
-"""
-
-    # Sending movie poster with caption
-    if details['poster_url']:
-        sent_msg = bot.send_photo(chat_id, photo=details['poster_url'], caption=caption, parse_mode="Markdown",
-                                  reply_markup=json.dumps({
-                                      "inline_keyboard": [[
-                                          {"text": "🎥 Get Movie", "switch_inline_query_current_chat": details['title']}
-                                      ]]
-                                  }))
-    else:
-        sent_msg = bot.send_message(chat_id, caption, parse_mode="Markdown",
-                                    reply_markup=json.dumps({
-                                        "inline_keyboard": [[
-                                            {"text": "🎥 Get Movie", "switch_inline_query_current_chat": details['title']}
-                                        ]]
-                                    }))
-
-    # Auto-delete after 20 minutes (1200 seconds)
-    delete_message_after_delay(bot, chat_id, sent_msg['message_id'])
-
-# Plugin settings for bot
-def main(bot, update):
-    movie_details_handler(bot, update)
+# Run the bot
+if __name__ == "__main__":
+    print("MovieBot is running...")
+    app.run()
