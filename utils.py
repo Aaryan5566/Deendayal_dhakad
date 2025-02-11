@@ -73,7 +73,20 @@ async def is_req_subscribed(bot, query):
 
     return False
 
+
 async def is_subscribed(bot, query, channels):
+    btn = []
+    for channel_id in channels:
+        try:
+            chat = await bot.get_chat(int(channel_id))
+            invite_link = (await bot.create_chat_invite_link(channel_id, creates_join_request=True)).invite_link
+            btn.append(
+                [InlineKeyboardButton(f'❤️ {chat.title}', url=invite_link)]
+            )
+        except Exception as e:
+            print(f"Error creating invite link: {e}")
+    return btn
+
     btn = []
     for channel_id in channels:
         try:

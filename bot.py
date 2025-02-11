@@ -52,6 +52,18 @@ async def Deendayal_start():
     bot_info = await DeendayalBot.get_me()
     DeendayalBot.username = bot_info.username
     await initialize_clients()
+
+async def enable_request_to_join(bot):
+    for channel_id in AUTH_CHANNEL:
+        try:
+            await bot.export_chat_invite_link(channel_id)
+            await bot.create_chat_invite_link(channel_id, creates_join_request=True)
+            print(f"Request to Join enabled for {channel_id}")
+        except Exception as e:
+            print(f"Error enabling Request to Join for {channel_id}: {e}")
+
+loop.create_task(enable_request_to_join(DeendayalBot))
+
     for name in files:
         with open(name) as a:
             patt = Path(a.name)
