@@ -1,5 +1,6 @@
 import time
 import asyncio
+import random
 from pyrogram import Client, filters
 import platform
 import os
@@ -7,11 +8,26 @@ import shutil
 
 CMD = ["/", "."]  
 
+# ✅ Random Reactions
+REACTIONS = ["🤡", "🫡", "🥰", "😇"]
+
 @Client.on_message(filters.command("alive", CMD))
 async def check_alive(_, message):
-    sticker = await message.reply_sticker("CAACAgIAAxkBAAEBVAlmCYqbLub_o5pVUOEwbqhV8kRytgACRBkAAgjh2UlSqev16oISqB4E") 
+    # Random Reaction
+    reaction = random.choice(REACTIONS)
+    
+    # Sending the reaction in bold and large
+    reaction_msg = await message.reply_text(f"**{reaction}**", parse_mode="markdown")
+    
+    # Sending the sticker
+    sticker = await message.reply_sticker("CAACAgIAAxkBAAEhzNdl6wzR3SsCw4dVU78FNpk0yCvn0gACKRgAAhP_2UkVxgiD_rlLGR4E")
+    
+    # Sending the alive message
     text = await message.reply_text("Yᴏᴜ ᴀʀᴇ ᴠᴇʀʏ ʟᴜᴄᴋʏ 🤞 I ᴀᴍ ᴀʟɪᴠᴇ ❤️\nPʀᴇss /start ᴛᴏ ᴜsᴇ ᴍᴇ!")
+
+    # Auto-deleting after 60 seconds
     await asyncio.sleep(60)
+    await reaction_msg.delete()
     await sticker.delete()
     await text.delete()
     await message.delete()
@@ -93,5 +109,3 @@ async def send_system_info(client, message):
     await asyncio.sleep(60)
     await info.delete()
     await message.delete()
-
-
